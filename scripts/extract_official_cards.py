@@ -17,7 +17,9 @@ import pandas as pd
 
 SOURCE_DIR = Path(__file__).resolve().parents[2] / "official-card-source"
 OUTPUT = Path(__file__).resolve().parents[1] / "app" / "ijinden-cards.ts"
+REFERENCE_CARDS = Path(__file__).resolve().parents[2] / "reference-ijinden-deck-builder" / "src" / "commons" / "cards.json"
 OFFICIAL_BASE = "https://one-draw.jp/ijinden/cardlist"
+TYPE_LABELS = {1: "イジン", 2: "ハイケイ", 4: "マホウ", 8: "マリョク"}
 
 
 def text(value: object) -> str:
@@ -68,14 +70,15 @@ def image_details(file_number: str, card_number: str) -> tuple[str, str, str]:
         "Y": "三国の英傑デッキ",
         "P": "発展する医学",
     }
+    filename_prefix = {"Y": "02_Y", "P": "03_P"}.get(deck_code, deck_code)
     return (
         f"{deck_code}-{suffix:03d}",
         deck_names[deck_code],
-        f"{OFFICIAL_BASE}/{deck_pages[deck_code]}/card/{deck_code}_{suffix:03d}.png",
+        f"{OFFICIAL_BASE}/{deck_pages[deck_code]}/card/{filename_prefix}_{suffix:03d}.png",
     )
 
 
-def read_file(file_number: str) -> list[dict[str, object]]:
+def read_file(file_number: str, reference_by_image: dict[str, dict[str, object]]) -> list[dict[str, object]]:
     workbook = SOURCE_DIR / f"{file_number}.xlsx"
     table = pd.read_excel(workbook, header=0).dropna(how="all")
     card_number_column = table.columns[0]
@@ -86,6 +89,9 @@ def read_file(file_number: str) -> list[dict[str, object]]:
         if not card_number or not name:
             continue
         card_id, default_set, image_url = image_details(file_number, card_number)
+        reference = reference_by_image.get(image_url)
+        if not reference or reference.get("type") not in TYPE_LABELS:
+            raise ValueError(f"No card-type record for {card_id}: {image_url}")
         release = column(row, "収録") or default_set
         color = column(row, "色").replace("-", "無") or "無"
         rule_text = column(row, "ルールテキスト")
@@ -97,6 +103,7 @@ def read_file(file_number: str) -> list[dict[str, object]]:
                 "number": card_number,
                 "name": name,
                 "release": release,
+                "cardType": TYPE_LABELS[reference["type"]],
                 "rarity": column(row, "レアリティ", "レアリティ\n") or "-",
                 "color": color,
                 "level": number(row.get("レベル")),
@@ -110,11 +117,13 @@ def read_file(file_number: str) -> list[dict[str, object]]:
 
 
 def main() -> None:
-    cards = [card for file_number in ("001", "002", "003", "004", "005", "006") for card in read_file(file_number)]
+    reference_cards = json.loads(REFERENCE_CARDS.read_text(encoding="utf-8"))
+    reference_by_image = {str(card["imageUrl"]): card for card in reference_cards}
+    cards = [card for file_number in ("001", "002", "003", "004", "005", "006") for card in read_file(file_number, reference_by_image)]
     ids = [str(card["id"]) for card in cards]
     if len(cards) != len(set(ids)):
         raise ValueError("Duplicate official card identifiers found")
-    header = """// Generated from official Ijinden card-list Excel files. Do not edit by hand.\n\nexport type IjindenCard = {\n  id: string;\n  number: string;\n  name: string;\n  release: string;\n  rarity: string;\n  color: string;\n  level: number | null;\n  power: number | null;\n  trait: string;\n  description: string;\n  imageUrl: string;\n};\n\nexport const ijindenCards: IjindenCard[] = """
+    header = """// Generated from official Ijinden card-list Excel files. Do not edit by hand.\n\nexport type IjindenCard = {\n  id: string;\n  number: string;\n  name: string;\n  release: string;\n  cardType: 'イジン' | 'ハイケイ' | 'マホウ' | 'マリョク';\n  rarity: string;\n  color: string;\n  level: number | null;\n  power: number | null;\n  trait: string;\n  description: string;\n  imageUrl: string;\n};\n\nexport const ijindenCards: IjindenCard[] = """
     OUTPUT.write_text(header + json.dumps(cards, ensure_ascii=False, separators=(",", ":")) + ";\n", encoding="utf-8")
     print(f"Wrote {len(cards)} cards to {OUTPUT}")
 

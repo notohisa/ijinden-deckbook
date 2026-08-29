@@ -22,11 +22,22 @@ declare global {
 }
 
 const cards: Card[] = ijindenCards;
+const cardTypes = ['イジン', 'ハイケイ', 'マホウ', 'マリョク'] as const;
+type CardType = (typeof cardTypes)[number];
+const cardsById = new Map(cards.map((card) => [card.id, card]));
 const initialDeck: Deck = { id: 'new-deck', name: '新しいデッキ', main: {}, side: {}, updatedAt: new Date().toISOString() };
 const driveScope = 'https://www.googleapis.com/auth/drive.appdata';
 const driveFileName = 'deckbook-data.json';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const countCards = (cardsInPile: Record<string, number>) => Object.values(cardsInPile).reduce((total, count) => total + count, 0);
+const countByCardType = (cardsInPile: Record<string, number>) => {
+  const totals: Record<CardType, number> = { イジン: 0, ハイケイ: 0, マホウ: 0, マリョク: 0 };
+  for (const [cardId, count] of Object.entries(cardsInPile)) {
+    const cardType = cardsById.get(cardId)?.cardType;
+    if (cardType) totals[cardType] += count;
+  }
+  return totals;
+};
 
 function newDeck(index: number): Deck {
   return { id: crypto.randomUUID(), name: '新しいデッキ ' + String(index), main: {}, side: {}, updatedAt: new Date().toISOString() };
@@ -109,6 +120,8 @@ export default function Home() {
   const activeDeck = decks.find((deck) => deck.id === activeDeckId) ?? decks[0];
   const mainCount = countCards(activeDeck.main);
   const sideCount = countCards(activeDeck.side);
+  const mainTypeCounts = countByCardType(activeDeck.main);
+  const sideTypeCounts = countByCardType(activeDeck.side);
   const matchingCards = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return cards;
@@ -242,7 +255,7 @@ export default function Home() {
                 <div className="flex items-start gap-3">
                   <img src={card.imageUrl} alt={card.name + 'のカード画像'} loading="lazy" className="h-[92px] w-[66px] shrink-0 rounded-md border border-black/15 bg-white object-cover object-top shadow-sm" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.id} · {card.rarity} · {card.color} · Lv.{card.level ?? '-'}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">×{inDeck}</span>}</div>
+                    <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.cardType} · {card.id} · {card.rarity} · {card.color} · Lv.{card.level ?? '-'}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">×{inDeck}</span>}</div>
                     <p className="mt-1 text-[10px] text-[var(--muted)]">{card.release}{card.power !== null ? ' · パワー ' + card.power : ''}</p>
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">{card.description || card.trait || '公式カード情報'}</p>
                     <p className="mt-2 text-[11px] font-medium text-[var(--red)]">タップして詳細・追加</p>
@@ -262,6 +275,10 @@ export default function Home() {
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">MAIN</p><p className="font-display text-2xl">{mainCount}</p></div>
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">SIDE</p><p className="font-display text-2xl">{sideCount}</p></div>
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">STATUS</p><p className={'pt-1 text-xs font-medium ' + (mainCount === 40 ? 'text-[var(--green)]' : 'text-[var(--red)]')}>{mainCount === 40 ? '完成' : mainCount < 40 ? String(40 - mainCount) + '枚あと' : String(mainCount - 40) + '枚超過'}</p></div>
+            </div>
+            <div className="mt-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
+              <div className="mb-2 flex items-center justify-between"><p className="text-[10px] font-medium tracking-wide text-[var(--muted)]">種類別枚数</p><p className="text-[10px] text-[var(--muted)]">メイン / サイド</p></div>
+              <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">{cardTypes.map((cardType) => <div key={cardType} className="rounded-lg bg-[var(--soft)] px-2 py-1.5 text-center"><p className="text-[11px] font-medium">{cardType}</p><p className="mt-0.5 text-xs text-[var(--muted)]"><span className="font-display text-base text-[var(--ink)]">{mainTypeCounts[cardType]}</span> / <span className="font-display text-base text-[var(--ink)]">{sideTypeCounts[cardType]}</span></p></div>)}</div>
             </div>
           </div>
           <div className="p-4 sm:p-5">
@@ -311,7 +328,7 @@ export default function Home() {
             <div className="min-w-0 flex-1">
               <h2 className="font-display text-2xl tracking-wide sm:text-3xl">{selectedCard.name}</h2>
               <p className="mt-1 text-xs text-[var(--muted)]">{selectedCard.id} · {selectedCard.release}</p>
-              <div className="mt-3 flex flex-wrap gap-1.5 text-xs"><span className="rounded-full bg-[var(--mist)] px-2 py-1">{selectedCard.rarity}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">{selectedCard.color}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">Lv.{selectedCard.level ?? '-'}</span>{selectedCard.power !== null && <span className="rounded-full bg-[var(--mist)] px-2 py-1">パワー {selectedCard.power}</span>}</div>
+              <div className="mt-3 flex flex-wrap gap-1.5 text-xs"><span className="rounded-full bg-[var(--ink)] px-2 py-1 text-white">{selectedCard.cardType}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">{selectedCard.rarity}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">{selectedCard.color}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">Lv.{selectedCard.level ?? '-'}</span>{selectedCard.power !== null && <span className="rounded-full bg-[var(--mist)] px-2 py-1">パワー {selectedCard.power}</span>}</div>
               {selectedCard.trait && <p className="mt-3 text-xs text-[var(--muted)]">{selectedCard.trait}</p>}
               <p className="mt-3 whitespace-pre-line text-xs leading-5 text-[var(--ink)] sm:text-sm">{selectedCard.description || '公式カード情報'}</p>
             </div>
@@ -340,7 +357,7 @@ function DeckPile({ title, pile, deck, onAdjust }: {
     {entries.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--soft)] px-4 py-6 text-center text-xs text-[var(--muted)]">左のカード一覧から追加してください</div> : <div className="overflow-hidden rounded-xl border border-[var(--line)]">
       {entries.map(({ card, count }) => <div key={card.id} className="flex items-center gap-3 border-b border-[var(--line)] bg-white px-3 py-2.5 last:border-b-0">
         <img src={card.imageUrl} alt="" className="size-9 shrink-0 rounded border border-black/15 bg-white object-cover object-top" />
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{card.name}</p><p className="text-[10px] text-[var(--muted)]">{card.id} · {card.rarity} · {card.color}</p></div>
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{card.name}</p><p className="text-[10px] text-[var(--muted)]">{card.cardType} · {card.id} · {card.rarity} · {card.color}</p></div>
         <div className="flex items-center gap-1"><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, -1)} aria-label={card.name + 'を1枚減らす'}>−</Button><span className="w-5 text-center font-display text-lg">{count}</span><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, 1)} aria-label={card.name + 'を1枚増やす'}>＋</Button></div>
       </div>)}
     </div>}
