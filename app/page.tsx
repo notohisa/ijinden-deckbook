@@ -99,6 +99,8 @@ export default function Home() {
   const [decks, setDecks] = useState<Deck[]>([initialDeck]);
   const [activeDeckId, setActiveDeckId] = useState(initialDeck.id);
   const [query, setQuery] = useState('');
+  const [catalogLimit, setCatalogLimit] = useState(80);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [mobileCardsOpen, setMobileCardsOpen] = useState(false);
   const [syncState, setSyncState] = useState<SyncState>('local');
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -114,6 +116,10 @@ export default function Home() {
       card.name + ' ' + card.number + ' ' + card.release + ' ' + card.rarity + ' ' + card.color + ' ' + card.trait + ' ' + card.description
     ).toLowerCase().includes(normalized));
   }, [query]);
+  const visibleCards = useMemo(() => matchingCards.slice(0, catalogLimit), [catalogLimit, matchingCards]);
+  const selectedCard = useMemo(() => cards.find((card) => card.id === selectedCardId) ?? null, [selectedCardId]);
+  const selectedMainCount = selectedCard ? activeDeck.main[selectedCard.id] ?? 0 : 0;
+  const selectedSideCount = selectedCard ? activeDeck.side[selectedCard.id] ?? 0 : 0;
   const archive = useMemo<ArchiveData>(() => ({ version: 1, updatedAt: new Date().toISOString(), decks }), [decks]);
   const persist = async (token: string, sourceArchive = archive) => {
     setSyncState('syncing');
@@ -172,6 +178,15 @@ export default function Home() {
     if (next === 0) delete currentPile[cardId]; else currentPile[cardId] = next;
     return { ...deck, [pile]: currentPile };
   });
+  const selectCard = (cardId: string) => {
+    setSelectedCardId(cardId);
+    setMobileCardsOpen(false);
+  };
+  const addSelectedCard = (pile: Pile) => {
+    if (!selectedCard) return;
+    adjustCard(selectedCard.id, pile, 1);
+    setNotice(selectedCard.name + 'を' + (pile === 'main' ? 'メインデッキ' : 'サイドデッキ') + 'に追加しました。');
+  };
   const createDeck = () => {
     const created = newDeck(decks.length + 1);
     setDecks((previous) => [created, ...previous]); setActiveDeckId(created.id);
@@ -214,27 +229,29 @@ export default function Home() {
       </header>
 
       <div className="mx-auto grid max-w-[1480px] gap-5 px-4 py-5 lg:grid-cols-[minmax(290px,0.85fr)_minmax(420px,1.4fr)_minmax(240px,0.65fr)] lg:px-6">
-        <section className={(mobileCardsOpen ? 'block ' : 'hidden ') + 'rounded-2xl border border-[var(--line)] bg-white/70 p-3 shadow-[0_12px_30px_rgb(33_38_45/0.04)] lg:block'} aria-label="カードを探す">
+        <section className={(mobileCardsOpen ? 'fixed inset-x-0 bottom-0 top-16 z-40 block overflow-y-auto rounded-t-2xl border-t border-[var(--line)] bg-[#f4f0e7] p-3 shadow-[0_-12px_30px_rgb(33_38_45/0.12)] ' : 'hidden ') + 'lg:relative lg:inset-auto lg:z-auto lg:block lg:overflow-visible lg:rounded-2xl lg:border lg:border-[var(--line)] lg:bg-white/70 lg:shadow-[0_12px_30px_rgb(33_38_45/0.04)]'} aria-label="カードを探す">
           <div className="mb-3 flex items-center justify-between gap-3 px-1 pt-1">
             <div><p className="label">CARD CATALOG</p><h1 className="font-display mt-1 text-xl tracking-wide">カードを探す</h1></div>
-            <span className="rounded-full bg-[var(--mist)] px-2 py-1 text-[11px] text-[var(--muted)]">{matchingCards.length}件</span>
+            <div className="flex items-center gap-2"><span className="rounded-full bg-[var(--mist)] px-2 py-1 text-[11px] text-[var(--muted)]">{matchingCards.length}件</span><Button variant="ghost" size="sm" className="lg:hidden" onClick={() => setMobileCardsOpen(false)}>閉じる</Button></div>
           </div>
-          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・色・収録・カード番号で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
-          <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1 lg:max-h-[calc(100vh-180px)]">
-            {matchingCards.map((card) => {
+          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => { setQuery(event.target.value); setCatalogLimit(80); }} placeholder="名前・色・収録・カード番号で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
+          <div className="max-h-[calc(100vh-180px)] space-y-2 overflow-y-auto pr-1 lg:max-h-[calc(100vh-180px)]">
+            {visibleCards.map((card) => {
               const inDeck = (activeDeck.main[card.id] ?? 0) + (activeDeck.side[card.id] ?? 0);
-              return <article key={card.id} className="group rounded-xl border border-transparent bg-[var(--soft)] p-3 transition hover:border-[var(--line)] hover:bg-white">
+              return <button type="button" key={card.id} onClick={() => selectCard(card.id)} className="group w-full rounded-xl border border-transparent bg-[var(--soft)] p-3 text-left transition hover:border-[var(--line)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]">
                 <div className="flex items-start gap-3">
                   <img src={card.imageUrl} alt={card.name + 'のカード画像'} loading="lazy" className="h-[92px] w-[66px] shrink-0 rounded-md border border-black/15 bg-white object-cover object-top shadow-sm" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.id} · {card.rarity} · {card.color} · Lv.{card.level ?? '-'}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">×{inDeck}</span>}</div>
                     <p className="mt-1 text-[10px] text-[var(--muted)]">{card.release}{card.power !== null ? ' · パワー ' + card.power : ''}</p>
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">{card.description || card.trait || '公式カード情報'}</p>
-                    <div className="mt-2.5 flex gap-1.5"><Button size="sm" variant="outline" className="h-7 border-[var(--line)] bg-white text-[11px]" onClick={() => adjustCard(card.id, 'main', 1)}>＋ メイン</Button><Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => adjustCard(card.id, 'side', 1)}>＋ サイド</Button></div>
+                    <p className="mt-2 text-[11px] font-medium text-[var(--red)]">タップして詳細・追加</p>
                   </div>
                 </div>
-              </article>;
+              </button>;
             })}
+            {visibleCards.length === 0 && <p className="rounded-xl bg-[var(--soft)] px-3 py-8 text-center text-xs text-[var(--muted)]">一致するカードがありません。</p>}
+            {visibleCards.length < matchingCards.length && <Button variant="outline" className="w-full border-[var(--line)] bg-white" onClick={() => setCatalogLimit((limit) => limit + 80)}>さらにカードを表示（残り {matchingCards.length - visibleCards.length}件）</Button>}
           </div>
         </section>
 
@@ -248,7 +265,7 @@ export default function Home() {
             </div>
           </div>
           <div className="p-4 sm:p-5">
-            <div className="mb-3 flex items-center justify-between lg:hidden"><button type="button" className="flex items-center gap-2 text-sm font-medium" onClick={() => setMobileCardsOpen((open) => !open)}>☰ {mobileCardsOpen ? 'カード一覧を閉じる' : 'カードを追加する'}</button><span className="text-xs text-[var(--muted)]">検索・追加</span></div>
+            <div className="mb-4 lg:hidden"><Button type="button" variant="outline" className="w-full border-[var(--line)] bg-[var(--paper)]" onClick={() => setMobileCardsOpen((open) => !open)}>⌕ {mobileCardsOpen ? 'カード一覧を閉じる' : 'カードを探して追加する'}</Button></div>
             <DeckPile title="メインデッキ" pile="main" deck={activeDeck} onAdjust={adjustCard} />
             <DeckPile title="サイドデッキ" pile="side" deck={activeDeck} onAdjust={adjustCard} />
           </div>
@@ -282,6 +299,30 @@ export default function Home() {
           </section>
         </aside>
       </div>
+      {selectedCard && <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-0 sm:place-items-center sm:p-5" role="dialog" aria-modal="true" aria-label={selectedCard.name + 'を追加'}>
+        <button type="button" className="absolute inset-0 cursor-default" aria-label="カード詳細を閉じる" onClick={() => setSelectedCardId(null)} />
+        <section className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-[#f8f5ee] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <p className="label">CARD DETAIL</p>
+            <Button variant="ghost" size="icon-sm" onClick={() => setSelectedCardId(null)} aria-label="閉じる">×</Button>
+          </div>
+          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:gap-6">
+            <img src={selectedCard.imageUrl} alt={selectedCard.name + 'のカード画像'} className="mx-auto h-[240px] w-[172px] shrink-0 rounded-lg border border-black/20 bg-white object-cover object-top shadow-lg sm:mx-0 sm:h-[310px] sm:w-[222px]" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-2xl tracking-wide sm:text-3xl">{selectedCard.name}</h2>
+              <p className="mt-1 text-xs text-[var(--muted)]">{selectedCard.id} · {selectedCard.release}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5 text-xs"><span className="rounded-full bg-[var(--mist)] px-2 py-1">{selectedCard.rarity}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">{selectedCard.color}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">Lv.{selectedCard.level ?? '-'}</span>{selectedCard.power !== null && <span className="rounded-full bg-[var(--mist)] px-2 py-1">パワー {selectedCard.power}</span>}</div>
+              {selectedCard.trait && <p className="mt-3 text-xs text-[var(--muted)]">{selectedCard.trait}</p>}
+              <p className="mt-3 whitespace-pre-line text-xs leading-5 text-[var(--ink)] sm:text-sm">{selectedCard.description || '公式カード情報'}</p>
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[var(--line)] pt-4">
+            <Button className="h-12 bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85" onClick={() => addSelectedCard('main')}>＋ メインに追加 <span className="ml-1 opacity-70">×{selectedMainCount}</span></Button>
+            <Button variant="outline" className="h-12 border-[var(--line)] bg-white" onClick={() => addSelectedCard('side')}>＋ サイドに追加 <span className="ml-1 text-[var(--muted)]">×{selectedSideCount}</span></Button>
+          </div>
+          <p className="mt-2 text-center text-[11px] text-[var(--muted)]">追加ボタンを続けて押すと同じカードを複数枚入れられます。</p>
+        </section>
+      </div>}
       <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5">✦ 非公式のデッキ作成補助アプリです。デッキデータはあなたのGoogle Driveに保存します。</span></footer>
     </main>
   );
