@@ -1,0 +1,9 @@
+{
+  "name": "デッキ帳",
+  "short_name": "デッキ帳",
+  "description": "Google Driveにデッキを保存するデッキ作成アプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f0e7",
+  "theme_color": "#202b35"
+}

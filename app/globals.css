@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+:root {
+  --paper: #f4f0e7; --soft: #fbf9f4; --mist: #e8edf0; --ink: #202b35;
+  --muted: #69737a; --line: #d8d3c8; --red: #b8493f; --green: #2e7c68;
+  --background: var(--paper); --foreground: var(--ink); --card: #fff; --card-foreground: var(--ink);
+  --popover: #fff; --popover-foreground: var(--ink); --primary: var(--ink); --primary-foreground: var(--paper);
+  --secondary: var(--mist); --secondary-foreground: var(--ink); --muted-foreground: var(--muted);
+  --accent: var(--mist); --accent-foreground: var(--ink); --destructive: #b8493f; --border: var(--line);
+  --input: var(--line); --ring: #6f99a0; --radius: .8rem;
+}
+@theme inline {
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --font-sans: Arial, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+  --font-heading: Georgia, 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+  --color-border: var(--border); --color-input: var(--input); --color-ring: var(--ring);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--mist); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive); --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+}
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body { margin: 0; font-family: Arial, 'Hiragino Sans', 'Yu Gothic UI', sans-serif; }
+button, input { font: inherit; }
+.font-display { font-family: Georgia, 'Yu Mincho', 'Hiragino Mincho ProN', serif; }
+.label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .15em; }
+.page-grain { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .35; background-image: radial-gradient(#aa9c8325 .55px, transparent .55px); background-size: 6px 6px; }
+main > :not(.page-grain) { position: relative; z-index: 1; }
+.card-sigil { display: grid; height: 34px; width: 34px; place-items: center; border-radius: 9px 9px 3px 9px; color: #fff; font-family: Georgia, 'Yu Mincho', serif; font-size: 14px; font-weight: bold; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); }
+.sigil-赤 { background: #c05443; } .sigil-青 { background: #477d9c; } .sigil-黄 { background: #bb9136; } .sigil-緑 { background: #498060; } .sigil-紫 { background: #6f5e91; } .sigil-白 { background: #9da5a8; } .sigil-黒 { background: #37404a; }
+::selection { background: #cfe1de; color: var(--ink); }
