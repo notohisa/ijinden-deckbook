@@ -130,17 +130,6 @@ function RangeFilter({ label, min, max, ceiling, step = 1, onMinChange, onMaxCha
   return <div><p className="text-xs font-medium">{label}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{min} 〜 {max}</p><div className="mt-1 grid grid-cols-2 gap-2"><input aria-label={label + 'の下限'} type="range" min="0" max={ceiling} step={step} value={min} onChange={(event) => onMinChange(Math.min(Number(event.target.value), max))} /><input aria-label={label + 'の上限'} type="range" min="0" max={ceiling} step={step} value={max} onChange={(event) => onMaxChange(Math.max(Number(event.target.value), min))} /></div></div>;
 }
 
-function CardCounter({ label, count, onDecrease, onIncrease }: { label: string; count: number; onDecrease: () => void; onIncrease: () => void }) {
-  return <section className="overflow-hidden rounded-xl border border-[var(--line)] bg-white">
-    <h3 className="border-b border-[var(--line)] px-3 py-2 text-center font-display text-lg tracking-wide">{label}</h3>
-    <div className="grid grid-cols-[1fr_1.1fr_1fr]">
-      <Button type="button" variant="ghost" disabled={count === 0} onClick={onDecrease} className="h-14 rounded-none border-r border-[var(--line)] text-2xl text-[var(--muted)]">−</Button>
-      <output aria-label={label + 'に入っている枚数'} className="grid h-14 place-items-center font-display text-3xl">{count}</output>
-      <Button type="button" variant="ghost" onClick={onIncrease} className="h-14 rounded-none border-l border-[var(--line)] text-2xl text-[var(--ink)]">＋</Button>
-    </div>
-  </section>;
-}
-
 function CatalogCardCounter({ label, count, onDecrease, onIncrease }: { label: string; count: number; onDecrease: () => void; onIncrease: () => void }) {
   return <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
     <h3 className="border-b border-[var(--line)] px-2 py-1 text-center text-[11px] font-medium tracking-wide text-[var(--muted)]">{label}</h3>
@@ -208,8 +197,6 @@ export default function Home() {
   }, [levelMax, levelMin, powerMax, powerMin, query, selectedColors, selectedKeywords, selectedRarities, selectedReleases, selectedTypes, sortBy]);
   const visibleCards = useMemo(() => matchingCards.slice(0, catalogLimit), [catalogLimit, matchingCards]);
   const selectedCard = useMemo(() => cards.find((card) => card.id === selectedCardId) ?? null, [selectedCardId]);
-  const selectedMainCount = selectedCard ? activeDeck.main[selectedCard.id] ?? 0 : 0;
-  const selectedSideCount = selectedCard ? activeDeck.side[selectedCard.id] ?? 0 : 0;
   const activeFilterCount = selectedTypes.length + selectedColors.length + selectedRarities.length + selectedReleases.length + selectedKeywords.length + Number(levelMin !== 0 || levelMax !== 17) + Number(powerMin !== 0 || powerMax !== 10000);
   const archive = useMemo<ArchiveData>(() => ({ version: 1, updatedAt: new Date().toISOString(), decks }), [decks]);
   const persist = async (token: string, sourceArchive = archive) => {
@@ -272,16 +259,6 @@ export default function Home() {
   const selectCard = (cardId: string) => {
     setSelectedCardId(cardId);
     setMobileCardsOpen(false);
-  };
-  const addSelectedCard = (pile: Pile) => {
-    if (!selectedCard) return;
-    adjustCard(selectedCard.id, pile, 1);
-    setNotice(selectedCard.name + 'を' + (pile === 'main' ? 'メインデッキ' : 'サイドデッキ') + 'に追加しました。');
-  };
-  const removeSelectedCard = (pile: Pile) => {
-    if (!selectedCard) return;
-    adjustCard(selectedCard.id, pile, -1);
-    setNotice(selectedCard.name + 'を' + (pile === 'main' ? 'メインデッキ' : 'サイドデッキ') + 'から1枚減らしました。');
   };
   const resetCardSearch = () => {
     setQuery(''); setSelectedTypes([]); setSelectedColors([]); setSelectedRarities([]); setSelectedReleases([]); setSelectedKeywords([]);
@@ -444,11 +421,6 @@ export default function Home() {
               <p className="mt-3 whitespace-pre-line text-xs leading-5 text-[var(--ink)] sm:text-sm">{selectedCard.description || '公式カード情報'}</p>
             </div>
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--line)] pt-4">
-            <CardCounter label="メイン" count={selectedMainCount} onDecrease={() => removeSelectedCard('main')} onIncrease={() => addSelectedCard('main')} />
-            <CardCounter label="サイド" count={selectedSideCount} onDecrease={() => removeSelectedCard('side')} onIncrease={() => addSelectedCard('side')} />
-          </div>
-          <p className="mt-2 text-center text-[11px] text-[var(--muted)]">＋／−でこのカードの枚数を直接調整できます。</p>
         </section>
       </div>}
       <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5">✦ 非公式のデッキ作成補助アプリです。デッキデータはあなたのGoogle Driveに保存します。</span></footer>
