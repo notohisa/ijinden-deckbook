@@ -130,6 +130,17 @@ function RangeFilter({ label, min, max, ceiling, step = 1, onMinChange, onMaxCha
   return <div><p className="text-xs font-medium">{label}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{min} 〜 {max}</p><div className="mt-1 grid grid-cols-2 gap-2"><input aria-label={label + 'の下限'} type="range" min="0" max={ceiling} step={step} value={min} onChange={(event) => onMinChange(Math.min(Number(event.target.value), max))} /><input aria-label={label + 'の上限'} type="range" min="0" max={ceiling} step={step} value={max} onChange={(event) => onMaxChange(Math.max(Number(event.target.value), min))} /></div></div>;
 }
 
+function CardCounter({ label, count, onDecrease, onIncrease }: { label: string; count: number; onDecrease: () => void; onIncrease: () => void }) {
+  return <section className="overflow-hidden rounded-xl border border-[var(--line)] bg-white">
+    <h3 className="border-b border-[var(--line)] px-3 py-2 text-center font-display text-lg tracking-wide">{label}</h3>
+    <div className="grid grid-cols-[1fr_1.1fr_1fr]">
+      <Button type="button" variant="ghost" disabled={count === 0} onClick={onDecrease} className="h-14 rounded-none border-r border-[var(--line)] text-2xl text-[var(--muted)]">−</Button>
+      <output aria-label={label + 'に入っている枚数'} className="grid h-14 place-items-center font-display text-3xl">{count}</output>
+      <Button type="button" variant="ghost" onClick={onIncrease} className="h-14 rounded-none border-l border-[var(--line)] text-2xl text-[var(--ink)]">＋</Button>
+    </div>
+  </section>;
+}
+
 export default function Home() {
   const [decks, setDecks] = useState<Deck[]>([initialDeck]);
   const [activeDeckId, setActiveDeckId] = useState(initialDeck.id);
@@ -255,6 +266,11 @@ export default function Home() {
     if (!selectedCard) return;
     adjustCard(selectedCard.id, pile, 1);
     setNotice(selectedCard.name + 'を' + (pile === 'main' ? 'メインデッキ' : 'サイドデッキ') + 'に追加しました。');
+  };
+  const removeSelectedCard = (pile: Pile) => {
+    if (!selectedCard) return;
+    adjustCard(selectedCard.id, pile, -1);
+    setNotice(selectedCard.name + 'を' + (pile === 'main' ? 'メインデッキ' : 'サイドデッキ') + 'から1枚減らしました。');
   };
   const resetCardSearch = () => {
     setQuery(''); setSelectedTypes([]); setSelectedColors([]); setSelectedRarities([]); setSelectedReleases([]); setSelectedKeywords([]);
@@ -409,11 +425,11 @@ export default function Home() {
               <p className="mt-3 whitespace-pre-line text-xs leading-5 text-[var(--ink)] sm:text-sm">{selectedCard.description || '公式カード情報'}</p>
             </div>
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[var(--line)] pt-4">
-            <Button className="h-12 bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85" onClick={() => addSelectedCard('main')}>＋ メインに追加 <span className="ml-1 opacity-70">×{selectedMainCount}</span></Button>
-            <Button variant="outline" className="h-12 border-[var(--line)] bg-white" onClick={() => addSelectedCard('side')}>＋ サイドに追加 <span className="ml-1 text-[var(--muted)]">×{selectedSideCount}</span></Button>
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--line)] pt-4">
+            <CardCounter label="メイン" count={selectedMainCount} onDecrease={() => removeSelectedCard('main')} onIncrease={() => addSelectedCard('main')} />
+            <CardCounter label="サイド" count={selectedSideCount} onDecrease={() => removeSelectedCard('side')} onIncrease={() => addSelectedCard('side')} />
           </div>
-          <p className="mt-2 text-center text-[11px] text-[var(--muted)]">追加ボタンを続けて押すと同じカードを複数枚入れられます。</p>
+          <p className="mt-2 text-center text-[11px] text-[var(--muted)]">＋／−でこのカードの枚数を直接調整できます。</p>
         </section>
       </div>}
       <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5">✦ 非公式のデッキ作成補助アプリです。デッキデータはあなたのGoogle Driveに保存します。</span></footer>
