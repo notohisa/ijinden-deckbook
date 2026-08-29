@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
@@ -9,17 +9,6 @@ type Pile = 'main' | 'side';
 type Card = IjindenCard;
 type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string };
 type ArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
-type SyncState = 'local' | 'syncing' | 'saved' | 'error';
-type GoogleTokenClient = { requestAccessToken: (options?: { prompt?: string }) => void };
-type GoogleTokenResponse = { access_token?: string; error?: string };
-
-declare global {
-  interface Window {
-    google?: { accounts: { oauth2: { initTokenClient: (options: {
-      client_id: string; scope: string; callback: (response: GoogleTokenResponse) => void;
-    }) => GoogleTokenClient } } };
-  }
-}
 
 const cards: Card[] = ijindenCards;
 const cardTypes = ['イジン', 'ハイケイ', 'マホウ', 'マリョク'] as const;
@@ -36,9 +25,7 @@ const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
 const releaseOptions = Array.from(new Set(cards.map((card) => card.release)));
 const rarityOptions = Array.from(new Set(cards.map((card) => card.rarity))).sort((a, b) => ['C', 'N', 'm', 'R', 'SR', 'PSR'].indexOf(a) - ['C', 'N', 'm', 'R', 'SR', 'PSR'].indexOf(b));
 const initialDeck: Deck = { id: 'new-deck', name: '新しいデッキ', main: {}, side: {}, updatedAt: new Date().toISOString() };
-const driveScope = 'https://www.googleapis.com/auth/drive.appdata';
-const driveFileName = 'deckbook-data.json';
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const localStorageKey = 'ijinden-deckbook-v1';
 const countCards = (cardsInPile: Record<string, number>) => Object.values(cardsInPile).reduce((total, count) => total + count, 0);
 const toggleFilterValue = <T,>(values: T[], value: T) => values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 const releaseLabel = (release: string) => release === 'ブースター' ? '第1弾ブースター' : release;
@@ -53,69 +40,6 @@ const countByCardType = (cardsInPile: Record<string, number>) => {
 
 function newDeck(index: number): Deck {
   return { id: crypto.randomUUID(), name: '新しいデッキ ' + String(index), main: {}, side: {}, updatedAt: new Date().toISOString() };
-}
-
-function loadGoogleIdentity() {
-  return new Promise<void>((resolve, reject) => {
-    if (window.google) return resolve();
-    const existing = document.querySelector<HTMLScriptElement>('script[data-google-identity]');
-    if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Google identity load failed')), { once: true });
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true; script.dataset.googleIdentity = 'true';
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Google identity load failed'));
-    document.head.appendChild(script);
-  });
-}
-
-async function findDriveFile(token: string) {
-  const query = encodeURIComponent("name = '" + driveFileName + "' and trashed = false");
-  const response = await fetch(
-    'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=' + query + '&fields=files(id,name,modifiedTime)',
-    { headers: { Authorization: 'Bearer ' + token } },
-  );
-  if (!response.ok) throw new Error('Driveの保存データを確認できませんでした。');
-  const result = await response.json() as { files?: Array<{ id: string }> };
-  return result.files?.[0];
-}
-
-async function uploadToDrive(token: string, archive: ArchiveData) {
-  const existingFile = await findDriveFile(token);
-  const boundary = 'deckbook_' + crypto.randomUUID();
-  const metadata = existingFile
-    ? { name: driveFileName, mimeType: 'application/json' }
-    : { name: driveFileName, mimeType: 'application/json', parents: ['appDataFolder'] };
-  const body = [
-    '--' + boundary, 'Content-Type: application/json; charset=UTF-8', '',
-    JSON.stringify(metadata), '--' + boundary, 'Content-Type: application/json; charset=UTF-8', '',
-    JSON.stringify(archive), '--' + boundary + '--', '',
-  ].join('\r\n');
-  const endpoint = existingFile
-    ? 'https://www.googleapis.com/upload/drive/v3/files/' + existingFile.id + '?uploadType=multipart'
-    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-  const response = await fetch(endpoint, {
-    method: existingFile ? 'PATCH' : 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'multipart/related; boundary=' + boundary },
-    body,
-  });
-  if (!response.ok) throw new Error('Driveへの保存に失敗しました。');
-}
-
-async function readFromDrive(token: string) {
-  const existingFile = await findDriveFile(token);
-  if (!existingFile) return null;
-  const response = await fetch('https://www.googleapis.com/drive/v3/files/' + existingFile.id + '?alt=media', {
-    headers: { Authorization: 'Bearer ' + token },
-  });
-  if (!response.ok) throw new Error('Driveの保存データを読み込めませんでした。');
-  const archive = await response.json() as ArchiveData;
-  if (archive.version !== 1 || !Array.isArray(archive.decks)) throw new Error('保存データの形式を確認できませんでした。');
-  return archive;
 }
 
 function FilterPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
@@ -158,10 +82,8 @@ export default function Home() {
   const [catalogLimit, setCatalogLimit] = useState(80);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [mobileCardsOpen, setMobileCardsOpen] = useState(false);
-  const [syncState, setSyncState] = useState<SyncState>('local');
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [localDataReady, setLocalDataReady] = useState(false);
   const [notice, setNotice] = useState('カードを追加して、あなたの最初のデッキを作りましょう。');
-  const initializedCloud = useRef(false);
   const activeDeck = decks.find((deck) => deck.id === activeDeckId) ?? decks[0];
   const mainCount = countCards(activeDeck.main);
   const sideCount = countCards(activeDeck.side);
@@ -199,52 +121,32 @@ export default function Home() {
   const selectedCard = useMemo(() => cards.find((card) => card.id === selectedCardId) ?? null, [selectedCardId]);
   const activeFilterCount = selectedTypes.length + selectedColors.length + selectedRarities.length + selectedReleases.length + selectedKeywords.length + Number(levelMin !== 0 || levelMax !== 17) + Number(powerMin !== 0 || powerMax !== 10000);
   const archive = useMemo<ArchiveData>(() => ({ version: 1, updatedAt: new Date().toISOString(), decks }), [decks]);
-  const persist = async (token: string, sourceArchive = archive) => {
-    setSyncState('syncing');
-    try {
-      await uploadToDrive(token, sourceArchive);
-      setSyncState('saved'); setNotice('Google Driveに安全に保存しました。');
-    } catch (error) {
-      setSyncState('error'); setNotice(error instanceof Error ? error.message : 'Driveへの保存に失敗しました。');
-    }
-  };
 
   useEffect(() => {
-    if (!accessToken || !initializedCloud.current) return;
-    const timer = window.setTimeout(() => { void persist(accessToken); }, 900);
-    return () => window.clearTimeout(timer);
-  }, [accessToken, decks]);
-
-  const connectGoogleDrive = async () => {
-    if (!googleClientId) {
-      setNotice('公開前に Google OAuth クライアントIDを設定してください。');
-      setSyncState('error');
-      return;
-    }
     try {
-      setSyncState('syncing'); await loadGoogleIdentity();
-      const token = await new Promise<string>((resolve, reject) => {
-        const client = window.google?.accounts.oauth2.initTokenClient({
-          client_id: googleClientId, scope: driveScope,
-          callback: (response) => response.error || !response.access_token
-            ? reject(new Error('Google Driveの連携を完了できませんでした。'))
-            : resolve(response.access_token as string),
-        });
-        if (!client) return reject(new Error('Googleログインを開始できませんでした。'));
-        client.requestAccessToken({ prompt: 'consent' });
-      });
-      const saved = await readFromDrive(token);
-      if (saved?.decks.length) {
-        setDecks(saved.decks); setActiveDeckId(saved.decks[0].id);
-        setNotice('Google Driveからマイデッキを読み込みました。'); setSyncState('saved');
-      } else {
-        await persist(token);
+      const saved = window.localStorage.getItem(localStorageKey);
+      if (!saved) return;
+      const savedArchive = JSON.parse(saved) as ArchiveData;
+      if (savedArchive.version === 1 && savedArchive.decks.length > 0) {
+        setDecks(savedArchive.decks);
+        setActiveDeckId(savedArchive.decks[0].id);
+        setNotice('この端末に保存したマイデッキを読み込みました。');
       }
-      initializedCloud.current = true; setAccessToken(token);
-    } catch (error) {
-      setSyncState('error'); setNotice(error instanceof Error ? error.message : 'Google Driveに接続できませんでした。');
+    } catch {
+      setNotice('この端末の保存データを読み込めませんでした。');
+    } finally {
+      setLocalDataReady(true);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!localDataReady) return;
+    try {
+      window.localStorage.setItem(localStorageKey, JSON.stringify(archive));
+    } catch {
+      setNotice('この端末に保存できませんでした。バックアップを作成してください。');
+    }
+  }, [archive, localDataReady]);
 
   const updateActiveDeck = (updater: (deck: Deck) => Deck) => setDecks((previous) =>
     previous.map((deck) => deck.id === activeDeckId
@@ -273,7 +175,7 @@ export default function Home() {
     if (decks.length === 1) return setNotice('最後の1つのデッキは削除できません。');
     const remaining = decks.filter((deck) => deck.id !== activeDeckId);
     setDecks(remaining); setActiveDeckId(remaining[0].id);
-    setNotice('デッキを削除しました。Drive連携中なら自動保存されます。');
+    setNotice('デッキを削除しました。この端末に自動保存されます。');
   };
   const downloadBackup = () => {
     const blob = new Blob([JSON.stringify(archive, null, 2)], { type: 'application/json' });
@@ -283,9 +185,6 @@ export default function Home() {
     link.click(); URL.revokeObjectURL(url);
     setNotice('復旧用バックアップをダウンロードしました。');
   };
-  const syncLabel = { local: 'この端末で編集中', syncing: 'Driveへ保存中…', saved: 'Google Driveに保存済み', error: 'Drive設定が必要です' }[syncState];
-  const saveOrConnect = () => void (accessToken ? persist(accessToken) : connectGoogleDrive());
-
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]">
       <div className="page-grain" aria-hidden="true" />
@@ -293,14 +192,10 @@ export default function Home() {
         <div className="mx-auto flex h-16 max-w-[1480px] items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--ink)] text-lg text-[var(--paper)] shadow-[3px_3px_0_var(--red)]">◆</div>
-            <div className="min-w-0"><p className="font-display text-lg leading-none tracking-[0.08em]">デッキ帳</p><p className="mt-1 text-[10px] tracking-[0.12em] text-[var(--muted)]">YOUR DECK, YOUR DRIVE</p></div>
-          </div>
-          <div className="hidden items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 px-3 py-1.5 text-xs text-[var(--muted)] md:flex">
-            <span className={syncState === 'saved' ? 'text-[var(--green)]' : ''}>{syncState === 'saved' ? '✓' : '☁'}</span>{syncLabel}
+            <div className="min-w-0"><p className="font-display text-lg leading-none tracking-[0.08em]">デッキ帳</p><p className="mt-1 text-[10px] tracking-[0.12em] text-[var(--muted)]">YOUR DECK, YOUR DEVICE</p></div>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="hidden border-[var(--line)] bg-white/70 sm:flex" onClick={downloadBackup}>↓ バックアップ</Button>
-            <Button className="bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85" onClick={saveOrConnect}>☁<span className="hidden sm:inline">{accessToken ? '今すぐ保存' : 'Google Driveに保存'}</span><span className="sm:hidden">保存</span></Button>
           </div>
         </div>
       </header>
@@ -378,12 +273,6 @@ export default function Home() {
         </section>
 
         <aside className="space-y-4">
-          <section className="rounded-2xl border border-[var(--line)] bg-[var(--ink)] p-4 text-[var(--paper)] shadow-[4px_4px_0_var(--red)]">
-            <div className="flex items-start gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10">☁</div><div><p className="text-[10px] font-semibold tracking-[0.13em] text-white/60">PRIVATE CLOUD SAVE</p><h2 className="font-display mt-1 text-lg tracking-wide">あなたのDriveへ</h2></div></div>
-            <p className="mt-3 text-xs leading-5 text-white/70">デッキはGoogle Drive内のアプリ専用領域へ保存します。他のDriveファイルは読みません。</p>
-            <Button className="mt-4 w-full bg-[var(--paper)] text-[var(--ink)] hover:bg-white" onClick={saveOrConnect}>{accessToken ? '☁ ' : '↥ '}{accessToken ? '変更をDriveへ保存' : 'Google Driveを連携'}</Button>
-            {!googleClientId && <p className="mt-3 text-[10px] leading-4 text-[#f2d7bf]">現在は公開前デモです。OAuthクライアントIDを設定すると連携できます。</p>}
-          </section>
           <section className="rounded-2xl border border-[var(--line)] bg-white/75 p-3">
             <div className="mb-2 flex items-center justify-between px-1 pt-1"><div><p className="label">MY DECKS</p><h2 className="font-display mt-1 text-lg tracking-wide">マイデッキ</h2></div><Button size="icon-sm" variant="outline" className="border-[var(--line)]" onClick={createDeck} aria-label="新しいデッキ">＋</Button></div>
             <div className="space-y-1">{decks.map((deck) => {
@@ -394,7 +283,7 @@ export default function Home() {
             })}</div>
           </section>
           <section className="rounded-2xl border border-dashed border-[var(--line)] bg-[#f4f0e7]/70 p-4">
-            <div className="flex gap-3"><span className="text-[var(--red)]">▣</span><div><p className="text-sm font-medium">自分でも保管できる</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">いつでもJSONバックアップをダウンロード。機種変更時の復元にも使えます。</p></div></div>
+            <div className="flex gap-3"><span className="text-[var(--red)]">▣</span><div><p className="text-sm font-medium">この端末に自動保存</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">デッキはこのブラウザ内に保存されます。念のためJSONバックアップも作れます。</p></div></div>
             <Button variant="link" className="mt-2 h-auto px-0 text-[var(--red)]" onClick={downloadBackup}>↓ バックアップを作る</Button>
           </section>
           <section className="rounded-2xl border border-dashed border-[var(--line)] bg-white/60 p-4 text-xs leading-5 text-[var(--muted)]">
@@ -423,7 +312,7 @@ export default function Home() {
           </div>
         </section>
       </div>}
-      <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5">✦ 非公式のデッキ作成補助アプリです。デッキデータはあなたのGoogle Driveに保存します。</span></footer>
+      <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5">✦ 非公式のデッキ作成補助アプリです。デッキデータはこの端末に保存します。</span></footer>
     </main>
   );
 }
