@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
 
 type Pile = 'main' | 'side';
-type Card = { id: string; name: string; category: string; color: string; level: number; description: string };
+type Card = IjindenCard;
 type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string };
 type ArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
 type SyncState = 'local' | 'syncing' | 'saved' | 'error';
@@ -20,23 +21,8 @@ declare global {
   }
 }
 
-const cards: Card[] = [
-  { id: 'scarlet-vanguard', name: '緋の先駆者', category: '人物', color: '赤', level: 2, description: '登場時、山札の上から1枚を見る。' },
-  { id: 'blue-archive', name: '蒼海の書庫', category: '拠点', color: '青', level: 1, description: 'ターン終了時、カードを1枚引く。' },
-  { id: 'golden-queen', name: '黄金の女王', category: '人物', color: '黄', level: 4, description: 'あなたの人物すべてに加護を与える。' },
-  { id: 'verdant-path', name: '翠の道標', category: '術', color: '緑', level: 2, description: '山札からレベル2以下の人物を探す。' },
-  { id: 'moonlit-oath', name: '月影の誓い', category: '術', color: '紫', level: 3, description: '選んだカードを手札へ戻す。' },
-  { id: 'white-citadel', name: '白銀の城塞', category: '拠点', color: '白', level: 3, description: '次に受けるダメージを1減らす。' },
-  { id: 'raven-scout', name: '夜鴉の斥候', category: '人物', color: '黒', level: 1, description: '相手の手札を1枚確認する。' },
-  { id: 'clockwork-compass', name: '時計仕掛けの羅針盤', category: '道具', color: '青', level: 2, description: '使用後、カードを1枚引く。' },
-  { id: 'crimson-rally', name: '紅蓮の号令', category: '術', color: '赤', level: 2, description: 'このターン、人物1体の力を上げる。' },
-];
-const sampleDeck: Deck = {
-  id: 'sample-deck', name: 'はじめてのデッキ',
-  main: { 'scarlet-vanguard': 3, 'blue-archive': 2, 'golden-queen': 2, 'verdant-path': 2, 'raven-scout': 3, 'clockwork-compass': 2, 'crimson-rally': 3 },
-  side: { 'white-citadel': 2, 'moonlit-oath': 1 },
-  updatedAt: '2026-08-29T10:00:00.000Z',
-};
+const cards: Card[] = ijindenCards;
+const initialDeck: Deck = { id: 'new-deck', name: '新しいデッキ', main: {}, side: {}, updatedAt: new Date().toISOString() };
 const driveScope = 'https://www.googleapis.com/auth/drive.appdata';
 const driveFileName = 'deckbook-data.json';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
@@ -110,8 +96,8 @@ async function readFromDrive(token: string) {
 }
 
 export default function Home() {
-  const [decks, setDecks] = useState<Deck[]>([sampleDeck]);
-  const [activeDeckId, setActiveDeckId] = useState(sampleDeck.id);
+  const [decks, setDecks] = useState<Deck[]>([initialDeck]);
+  const [activeDeckId, setActiveDeckId] = useState(initialDeck.id);
   const [query, setQuery] = useState('');
   const [mobileCardsOpen, setMobileCardsOpen] = useState(false);
   const [syncState, setSyncState] = useState<SyncState>('local');
@@ -124,7 +110,9 @@ export default function Home() {
   const matchingCards = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return cards;
-    return cards.filter((card) => (card.name + ' ' + card.category + ' ' + card.color + ' ' + card.description).toLowerCase().includes(normalized));
+    return cards.filter((card) => (
+      card.name + ' ' + card.number + ' ' + card.release + ' ' + card.rarity + ' ' + card.color + ' ' + card.trait + ' ' + card.description
+    ).toLowerCase().includes(normalized));
   }, [query]);
   const archive = useMemo<ArchiveData>(() => ({ version: 1, updatedAt: new Date().toISOString(), decks }), [decks]);
   const persist = async (token: string, sourceArchive = archive) => {
@@ -231,16 +219,17 @@ export default function Home() {
             <div><p className="label">CARD CATALOG</p><h1 className="font-display mt-1 text-xl tracking-wide">カードを探す</h1></div>
             <span className="rounded-full bg-[var(--mist)] px-2 py-1 text-[11px] text-[var(--muted)]">{matchingCards.length}件</span>
           </div>
-          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・色・種類で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
+          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・色・収録・カード番号で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
           <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1 lg:max-h-[calc(100vh-180px)]">
             {matchingCards.map((card) => {
               const inDeck = (activeDeck.main[card.id] ?? 0) + (activeDeck.side[card.id] ?? 0);
               return <article key={card.id} className="group rounded-xl border border-transparent bg-[var(--soft)] p-3 transition hover:border-[var(--line)] hover:bg-white">
                 <div className="flex items-start gap-3">
-                  <div className={'card-sigil sigil-' + card.color + ' shrink-0'} aria-hidden="true">{card.level}</div>
+                  <img src={card.imageUrl} alt={card.name + 'のカード画像'} loading="lazy" className="h-[92px] w-[66px] shrink-0 rounded-md border border-black/15 bg-white object-cover object-top shadow-sm" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.color} · {card.category} · Lv.{card.level}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">×{inDeck}</span>}</div>
-                    <p className="mt-2 line-clamp-1 text-xs leading-5 text-[var(--muted)]">{card.description}</p>
+                    <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.id} · {card.rarity} · {card.color} · Lv.{card.level ?? '-'}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">×{inDeck}</span>}</div>
+                    <p className="mt-1 text-[10px] text-[var(--muted)]">{card.release}{card.power !== null ? ' · パワー ' + card.power : ''}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">{card.description || card.trait || '公式カード情報'}</p>
                     <div className="mt-2.5 flex gap-1.5"><Button size="sm" variant="outline" className="h-7 border-[var(--line)] bg-white text-[11px]" onClick={() => adjustCard(card.id, 'main', 1)}>＋ メイン</Button><Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => adjustCard(card.id, 'side', 1)}>＋ サイド</Button></div>
                   </div>
                 </div>
@@ -255,7 +244,7 @@ export default function Home() {
             <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--line)] rounded-xl border border-[var(--line)] bg-[var(--soft)]">
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">MAIN</p><p className="font-display text-2xl">{mainCount}</p></div>
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">SIDE</p><p className="font-display text-2xl">{sideCount}</p></div>
-              <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">STATUS</p><p className={'pt-1 text-xs font-medium ' + (mainCount === 40 ? 'text-[var(--green)]' : 'text-[var(--red)]')}>{mainCount === 40 ? '完成' : String(40 - mainCount) + '枚あと'}</p></div>
+              <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">STATUS</p><p className={'pt-1 text-xs font-medium ' + (mainCount === 40 ? 'text-[var(--green)]' : 'text-[var(--red)]')}>{mainCount === 40 ? '完成' : mainCount < 40 ? String(40 - mainCount) + '枚あと' : String(mainCount - 40) + '枚超過'}</p></div>
             </div>
           </div>
           <div className="p-4 sm:p-5">
@@ -286,9 +275,14 @@ export default function Home() {
             <div className="flex gap-3"><span className="text-[var(--red)]">▣</span><div><p className="text-sm font-medium">自分でも保管できる</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">いつでもJSONバックアップをダウンロード。機種変更時の復元にも使えます。</p></div></div>
             <Button variant="link" className="mt-2 h-auto px-0 text-[var(--red)]" onClick={downloadBackup}>↓ バックアップを作る</Button>
           </section>
+          <section className="rounded-2xl border border-dashed border-[var(--line)] bg-white/60 p-4 text-xs leading-5 text-[var(--muted)]">
+            <p className="font-medium text-[var(--ink)]">公式カードデータについて</p>
+            <p className="mt-1">全576種の名称・能力文と画像は、イジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p>
+            <a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a>
+          </section>
         </aside>
       </div>
-      <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5">✦ デッキ帳は、あなたのカードデータをあなたのGoogle Driveに保存します。</span></footer>
+      <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5">✦ 非公式のデッキ作成補助アプリです。デッキデータはあなたのGoogle Driveに保存します。</span></footer>
     </main>
   );
 }
@@ -304,8 +298,8 @@ function DeckPile({ title, pile, deck, onAdjust }: {
     <div className="mb-2 flex items-center justify-between"><h2 className="font-display text-lg tracking-wide">{title}</h2><span className="text-xs text-[var(--muted)]">{countCards(deck[pile])}枚</span></div>
     {entries.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--soft)] px-4 py-6 text-center text-xs text-[var(--muted)]">左のカード一覧から追加してください</div> : <div className="overflow-hidden rounded-xl border border-[var(--line)]">
       {entries.map(({ card, count }) => <div key={card.id} className="flex items-center gap-3 border-b border-[var(--line)] bg-white px-3 py-2.5 last:border-b-0">
-        <div className={'card-sigil sigil-' + card.color + ' size-7 text-[10px]'} aria-hidden="true">{card.level}</div>
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{card.name}</p><p className="text-[10px] text-[var(--muted)]">{card.color} · {card.category}</p></div>
+        <img src={card.imageUrl} alt="" className="size-9 shrink-0 rounded border border-black/15 bg-white object-cover object-top" />
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{card.name}</p><p className="text-[10px] text-[var(--muted)]">{card.id} · {card.rarity} · {card.color}</p></div>
         <div className="flex items-center gap-1"><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, -1)} aria-label={card.name + 'を1枚減らす'}>−</Button><span className="w-5 text-center font-display text-lg">{count}</span><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, 1)} aria-label={card.name + 'を1枚増やす'}>＋</Button></div>
       </div>)}
     </div>}
