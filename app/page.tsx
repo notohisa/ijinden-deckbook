@@ -1,10 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Archive, Check, Cloud, Download, FolderOpen, Layers3, Menu, Plus, Search,
-  ShieldCheck, Sparkles, Trash2, UploadCloud, X,
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -216,15 +212,15 @@ export default function Home() {
       <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[#f4f0e7]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1480px] items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--ink)] text-[var(--paper)] shadow-[3px_3px_0_var(--red)]"><Layers3 className="size-5" strokeWidth={2.1} /></div>
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--ink)] text-lg text-[var(--paper)] shadow-[3px_3px_0_var(--red)]">◆</div>
             <div className="min-w-0"><p className="font-display text-lg leading-none tracking-[0.08em]">デッキ帳</p><p className="mt-1 text-[10px] tracking-[0.12em] text-[var(--muted)]">YOUR DECK, YOUR DRIVE</p></div>
           </div>
           <div className="hidden items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 px-3 py-1.5 text-xs text-[var(--muted)] md:flex">
-            {syncState === 'saved' ? <Check className="size-3.5 text-[var(--green)]" /> : <Cloud className="size-3.5" />}{syncLabel}
+            <span className={syncState === 'saved' ? 'text-[var(--green)]' : ''}>{syncState === 'saved' ? '✓' : '☁'}</span>{syncLabel}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="hidden border-[var(--line)] bg-white/70 sm:flex" onClick={downloadBackup}><Download /> バックアップ</Button>
-            <Button className="bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85" onClick={saveOrConnect}><Cloud className="size-4" /><span className="hidden sm:inline">{accessToken ? '今すぐ保存' : 'Google Driveに保存'}</span><span className="sm:hidden">保存</span></Button>
+            <Button variant="outline" size="sm" className="hidden border-[var(--line)] bg-white/70 sm:flex" onClick={downloadBackup}>↓ バックアップ</Button>
+            <Button className="bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85" onClick={saveOrConnect}>☁<span className="hidden sm:inline">{accessToken ? '今すぐ保存' : 'Google Driveに保存'}</span><span className="sm:hidden">保存</span></Button>
           </div>
         </div>
       </header>
@@ -235,7 +231,7 @@ export default function Home() {
             <div><p className="label">CARD CATALOG</p><h1 className="font-display mt-1 text-xl tracking-wide">カードを探す</h1></div>
             <span className="rounded-full bg-[var(--mist)] px-2 py-1 text-[11px] text-[var(--muted)]">{matchingCards.length}件</span>
           </div>
-          <div className="relative mb-3"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--muted)]" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・色・種類で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
+          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・色・種類で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
           <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1 lg:max-h-[calc(100vh-180px)]">
             {matchingCards.map((card) => {
               const inDeck = (activeDeck.main[card.id] ?? 0) + (activeDeck.side[card.id] ?? 0);
@@ -245,7 +241,7 @@ export default function Home() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.color} · {card.category} · Lv.{card.level}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">×{inDeck}</span>}</div>
                     <p className="mt-2 line-clamp-1 text-xs leading-5 text-[var(--muted)]">{card.description}</p>
-                    <div className="mt-2.5 flex gap-1.5"><Button size="sm" variant="outline" className="h-7 border-[var(--line)] bg-white text-[11px]" onClick={() => adjustCard(card.id, 'main', 1)}><Plus className="size-3" /> メイン</Button><Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => adjustCard(card.id, 'side', 1)}><Plus className="size-3" /> サイド</Button></div>
+                    <div className="mt-2.5 flex gap-1.5"><Button size="sm" variant="outline" className="h-7 border-[var(--line)] bg-white text-[11px]" onClick={() => adjustCard(card.id, 'main', 1)}>＋ メイン</Button><Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => adjustCard(card.id, 'side', 1)}>＋ サイド</Button></div>
                   </div>
                 </div>
               </article>;
@@ -255,7 +251,7 @@ export default function Home() {
 
         <section className="min-w-0 rounded-2xl border border-[var(--line)] bg-white/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]" aria-label="編集中のデッキ">
           <div className="border-b border-[var(--line)] px-4 py-4 sm:px-5">
-            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="label">NOW EDITING</p><Input aria-label="デッキ名" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="mt-1 h-auto border-0 bg-transparent px-0 py-0 font-display text-2xl tracking-[0.06em] shadow-none focus-visible:ring-0" /></div><Button variant="ghost" size="icon" className="shrink-0 text-[var(--muted)] hover:text-[var(--red)]" onClick={deleteDeck} aria-label="このデッキを削除"><Trash2 /></Button></div>
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="label">NOW EDITING</p><Input aria-label="デッキ名" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="mt-1 h-auto border-0 bg-transparent px-0 py-0 font-display text-2xl tracking-[0.06em] shadow-none focus-visible:ring-0" /></div><Button variant="ghost" size="icon" className="shrink-0 text-[var(--muted)] hover:text-[var(--red)]" onClick={deleteDeck} aria-label="このデッキを削除">⌫</Button></div>
             <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--line)] rounded-xl border border-[var(--line)] bg-[var(--soft)]">
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">MAIN</p><p className="font-display text-2xl">{mainCount}</p></div>
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">SIDE</p><p className="font-display text-2xl">{sideCount}</p></div>
@@ -263,36 +259,36 @@ export default function Home() {
             </div>
           </div>
           <div className="p-4 sm:p-5">
-            <div className="mb-3 flex items-center justify-between lg:hidden"><button type="button" className="flex items-center gap-2 text-sm font-medium" onClick={() => setMobileCardsOpen((open) => !open)}><Menu className="size-4" /> {mobileCardsOpen ? 'カード一覧を閉じる' : 'カードを追加する'}</button><span className="text-xs text-[var(--muted)]">検索・追加</span></div>
+            <div className="mb-3 flex items-center justify-between lg:hidden"><button type="button" className="flex items-center gap-2 text-sm font-medium" onClick={() => setMobileCardsOpen((open) => !open)}>☰ {mobileCardsOpen ? 'カード一覧を閉じる' : 'カードを追加する'}</button><span className="text-xs text-[var(--muted)]">検索・追加</span></div>
             <DeckPile title="メインデッキ" pile="main" deck={activeDeck} onAdjust={adjustCard} />
             <DeckPile title="サイドデッキ" pile="side" deck={activeDeck} onAdjust={adjustCard} />
           </div>
-          <div className="border-t border-[var(--line)] bg-[var(--soft)] px-4 py-3 sm:px-5"><p className="flex items-start gap-2 text-xs leading-5 text-[var(--muted)]"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-[var(--green)]" />{notice}</p></div>
+          <div className="border-t border-[var(--line)] bg-[var(--soft)] px-4 py-3 sm:px-5"><p className="flex items-start gap-2 text-xs leading-5 text-[var(--muted)]"><span className="text-[var(--green)]">●</span>{notice}</p></div>
         </section>
 
         <aside className="space-y-4">
           <section className="rounded-2xl border border-[var(--line)] bg-[var(--ink)] p-4 text-[var(--paper)] shadow-[4px_4px_0_var(--red)]">
-            <div className="flex items-start gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10"><Cloud className="size-5" /></div><div><p className="text-[10px] font-semibold tracking-[0.13em] text-white/60">PRIVATE CLOUD SAVE</p><h2 className="font-display mt-1 text-lg tracking-wide">あなたのDriveへ</h2></div></div>
+            <div className="flex items-start gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10">☁</div><div><p className="text-[10px] font-semibold tracking-[0.13em] text-white/60">PRIVATE CLOUD SAVE</p><h2 className="font-display mt-1 text-lg tracking-wide">あなたのDriveへ</h2></div></div>
             <p className="mt-3 text-xs leading-5 text-white/70">デッキはGoogle Drive内のアプリ専用領域へ保存します。他のDriveファイルは読みません。</p>
-            <Button className="mt-4 w-full bg-[var(--paper)] text-[var(--ink)] hover:bg-white" onClick={saveOrConnect}>{accessToken ? <Cloud className="size-4" /> : <UploadCloud className="size-4" />}{accessToken ? '変更をDriveへ保存' : 'Google Driveを連携'}</Button>
+            <Button className="mt-4 w-full bg-[var(--paper)] text-[var(--ink)] hover:bg-white" onClick={saveOrConnect}>{accessToken ? '☁ ' : '↥ '}{accessToken ? '変更をDriveへ保存' : 'Google Driveを連携'}</Button>
             {!googleClientId && <p className="mt-3 text-[10px] leading-4 text-[#f2d7bf]">現在は公開前デモです。OAuthクライアントIDを設定すると連携できます。</p>}
           </section>
           <section className="rounded-2xl border border-[var(--line)] bg-white/75 p-3">
-            <div className="mb-2 flex items-center justify-between px-1 pt-1"><div><p className="label">MY DECKS</p><h2 className="font-display mt-1 text-lg tracking-wide">マイデッキ</h2></div><Button size="icon-sm" variant="outline" className="border-[var(--line)]" onClick={createDeck} aria-label="新しいデッキ"><Plus /></Button></div>
+            <div className="mb-2 flex items-center justify-between px-1 pt-1"><div><p className="label">MY DECKS</p><h2 className="font-display mt-1 text-lg tracking-wide">マイデッキ</h2></div><Button size="icon-sm" variant="outline" className="border-[var(--line)]" onClick={createDeck} aria-label="新しいデッキ">＋</Button></div>
             <div className="space-y-1">{decks.map((deck) => {
               const isActive = deck.id === activeDeckId;
               return <button type="button" key={deck.id} onClick={() => setActiveDeckId(deck.id)} className={'w-full rounded-xl px-3 py-2.5 text-left transition ' + (isActive ? 'bg-[var(--mist)] ring-1 ring-[var(--line)]' : 'hover:bg-[var(--soft)]')}>
-                <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span>{isActive && <Check className="size-3.5 shrink-0 text-[var(--green)]" />}</span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span>
+                <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span>{isActive && <span className="shrink-0 text-[var(--green)]">✓</span>}</span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span>
               </button>;
             })}</div>
           </section>
           <section className="rounded-2xl border border-dashed border-[var(--line)] bg-[#f4f0e7]/70 p-4">
-            <div className="flex gap-3"><FolderOpen className="mt-0.5 size-4 text-[var(--red)]" /><div><p className="text-sm font-medium">自分でも保管できる</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">いつでもJSONバックアップをダウンロード。機種変更時の復元にも使えます。</p></div></div>
-            <Button variant="link" className="mt-2 h-auto px-0 text-[var(--red)]" onClick={downloadBackup}><Archive className="size-4" /> バックアップを作る</Button>
+            <div className="flex gap-3"><span className="text-[var(--red)]">▣</span><div><p className="text-sm font-medium">自分でも保管できる</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">いつでもJSONバックアップをダウンロード。機種変更時の復元にも使えます。</p></div></div>
+            <Button variant="link" className="mt-2 h-auto px-0 text-[var(--red)]" onClick={downloadBackup}>↓ バックアップを作る</Button>
           </section>
         </aside>
       </div>
-      <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5"><Sparkles className="size-3" /> デッキ帳は、あなたのカードデータをあなたのGoogle Driveに保存します。</span></footer>
+      <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6"><span className="inline-flex items-center gap-1.5">✦ デッキ帳は、あなたのカードデータをあなたのGoogle Driveに保存します。</span></footer>
     </main>
   );
 }
@@ -310,7 +306,7 @@ function DeckPile({ title, pile, deck, onAdjust }: {
       {entries.map(({ card, count }) => <div key={card.id} className="flex items-center gap-3 border-b border-[var(--line)] bg-white px-3 py-2.5 last:border-b-0">
         <div className={'card-sigil sigil-' + card.color + ' size-7 text-[10px]'} aria-hidden="true">{card.level}</div>
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{card.name}</p><p className="text-[10px] text-[var(--muted)]">{card.color} · {card.category}</p></div>
-        <div className="flex items-center gap-1"><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, -1)} aria-label={card.name + 'を1枚減らす'}><X /></Button><span className="w-5 text-center font-display text-lg">{count}</span><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, 1)} aria-label={card.name + 'を1枚増やす'}><Plus /></Button></div>
+        <div className="flex items-center gap-1"><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, -1)} aria-label={card.name + 'を1枚減らす'}>−</Button><span className="w-5 text-center font-display text-lg">{count}</span><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, 1)} aria-label={card.name + 'を1枚増やす'}>＋</Button></div>
       </div>)}
     </div>}
   </section>;
