@@ -195,7 +195,7 @@ export default function Home() {
             <div className="min-w-0"><p className="font-display text-lg leading-none tracking-[0.08em]">デッキ帳</p><p className="mt-1 text-[10px] tracking-[0.12em] text-[var(--muted)]">YOUR DECK, YOUR DEVICE</p></div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="hidden border-[var(--line)] bg-white/70 sm:flex" onClick={downloadBackup}>↓ バックアップ</Button>
+            <Button variant="outline" size="sm" className="border-[var(--line)] bg-white/70" onClick={downloadBackup}>↓ バックアップ</Button>
           </div>
         </div>
       </header>
@@ -281,10 +281,6 @@ export default function Home() {
                 <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span>{isActive && <span className="shrink-0 text-[var(--green)]">✓</span>}</span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span>
               </button>;
             })}</div>
-          </section>
-          <section className="rounded-2xl border border-dashed border-[var(--line)] bg-[#f4f0e7]/70 p-4">
-            <div className="flex gap-3"><span className="text-[var(--red)]">▣</span><div><p className="text-sm font-medium">この端末に自動保存</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">デッキはこのブラウザ内に保存されます。念のためJSONバックアップも作れます。</p></div></div>
-            <Button variant="link" className="mt-2 h-auto px-0 text-[var(--red)]" onClick={downloadBackup}>↓ バックアップを作る</Button>
           </section>
           <section className="rounded-2xl border border-dashed border-[var(--line)] bg-white/60 p-4 text-xs leading-5 text-[var(--muted)]">
             <p className="font-medium text-[var(--ink)]">公式カードデータについて</p>
