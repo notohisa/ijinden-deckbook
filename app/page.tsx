@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
@@ -24,12 +24,24 @@ declare global {
 const cards: Card[] = ijindenCards;
 const cardTypes = ['イジン', 'ハイケイ', 'マホウ', 'マリョク'] as const;
 type CardType = (typeof cardTypes)[number];
+type SortBy = 'official' | 'level' | 'power' | 'type' | 'color' | 'name';
+const colorOptions = ['赤', '青', '緑', '黄', '紫', '無'] as const;
+const abilityKeywordOptions = ['剣術', '美術', '音楽', '思想', '医術', '志願', '航海', '執筆', '決起', '徴募', '魔導', '勝鬨', '躍進', '魔力化', '冥府発動', '復元', '反魂', '木霊', '喪神'];
+const sortOptions: Array<{ value: SortBy; label: string }> = [
+  { value: 'official', label: '公式順' }, { value: 'level', label: 'レベル順' }, { value: 'power', label: 'パワー順' },
+  { value: 'type', label: '種類順' }, { value: 'color', label: '色順' }, { value: 'name', label: '名前順' },
+];
 const cardsById = new Map(cards.map((card) => [card.id, card]));
+const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
+const releaseOptions = Array.from(new Set(cards.map((card) => card.release)));
+const rarityOptions = Array.from(new Set(cards.map((card) => card.rarity))).sort((a, b) => ['C', 'N', 'm', 'R', 'SR', 'PSR'].indexOf(a) - ['C', 'N', 'm', 'R', 'SR', 'PSR'].indexOf(b));
 const initialDeck: Deck = { id: 'new-deck', name: '新しいデッキ', main: {}, side: {}, updatedAt: new Date().toISOString() };
 const driveScope = 'https://www.googleapis.com/auth/drive.appdata';
 const driveFileName = 'deckbook-data.json';
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const countCards = (cardsInPile: Record<string, number>) => Object.values(cardsInPile).reduce((total, count) => total + count, 0);
+const toggleFilterValue = <T,>(values: T[], value: T) => values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+const releaseLabel = (release: string) => release === 'ブースター' ? '第1弾ブースター' : release;
 const countByCardType = (cardsInPile: Record<string, number>) => {
   const totals: Record<CardType, number> = { イジン: 0, ハイケイ: 0, マホウ: 0, マリョク: 0 };
   for (const [cardId, count] of Object.entries(cardsInPile)) {
@@ -106,10 +118,32 @@ async function readFromDrive(token: string) {
   return archive;
 }
 
+function FilterPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return <Button type="button" size="xs" variant="outline" aria-pressed={active} onClick={onClick} className={active ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85 hover:text-[var(--paper)]' : 'border-[var(--line)] bg-white'}>{label}</Button>;
+}
+
+function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
+  return <div><p className="mb-1.5 text-xs font-medium">{label}</p><div className="flex flex-wrap gap-1">{children}</div></div>;
+}
+
+function RangeFilter({ label, min, max, ceiling, step = 1, onMinChange, onMaxChange }: { label: string; min: number; max: number; ceiling: number; step?: number; onMinChange: (value: number) => void; onMaxChange: (value: number) => void }) {
+  return <div><p className="text-xs font-medium">{label}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{min} 〜 {max}</p><div className="mt-1 grid grid-cols-2 gap-2"><input aria-label={label + 'の下限'} type="range" min="0" max={ceiling} step={step} value={min} onChange={(event) => onMinChange(Math.min(Number(event.target.value), max))} /><input aria-label={label + 'の上限'} type="range" min="0" max={ceiling} step={step} value={max} onChange={(event) => onMaxChange(Math.max(Number(event.target.value), min))} /></div></div>;
+}
+
 export default function Home() {
   const [decks, setDecks] = useState<Deck[]>([initialDeck]);
   const [activeDeckId, setActiveDeckId] = useState(initialDeck.id);
   const [query, setQuery] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState<CardType[]>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
+  const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
+  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
+  const [levelMin, setLevelMin] = useState(0);
+  const [levelMax, setLevelMax] = useState(17);
+  const [powerMin, setPowerMin] = useState(0);
+  const [powerMax, setPowerMax] = useState(10000);
+  const [sortBy, setSortBy] = useState<SortBy>('official');
   const [catalogLimit, setCatalogLimit] = useState(80);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [mobileCardsOpen, setMobileCardsOpen] = useState(false);
@@ -124,15 +158,37 @@ export default function Home() {
   const sideTypeCounts = countByCardType(activeDeck.side);
   const matchingCards = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return cards;
-    return cards.filter((card) => (
-      card.name + ' ' + card.number + ' ' + card.release + ' ' + card.rarity + ' ' + card.color + ' ' + card.trait + ' ' + card.description
-    ).toLowerCase().includes(normalized));
-  }, [query]);
+    const filtered = cards.filter((card) => {
+      const allText = (card.name + ' ' + card.number + ' ' + card.release + ' ' + card.rarity + ' ' + card.color + ' ' + card.cardType + ' ' + card.trait + ' ' + card.description).toLowerCase();
+      const matchesColor = selectedColors.length === 0 || selectedColors.some((color) => color === '無' ? card.color === '無' : card.color.includes(color));
+      const matchesLevel = card.level === null || (card.level >= levelMin && card.level <= levelMax);
+      const matchesPower = card.cardType !== 'イジン' || (card.power !== null && card.power >= powerMin && card.power <= powerMax);
+      const abilityText = card.trait + ' ' + card.description;
+      return (
+        (!normalized || allText.includes(normalized)) &&
+        (selectedTypes.length === 0 || selectedTypes.includes(card.cardType)) &&
+        matchesColor &&
+        (selectedRarities.length === 0 || selectedRarities.includes(card.rarity)) &&
+        (selectedReleases.length === 0 || selectedReleases.includes(card.release)) &&
+        (selectedKeywords.length === 0 || selectedKeywords.some((keyword) => abilityText.includes(keyword))) &&
+        matchesLevel && matchesPower
+      );
+    });
+    return filtered.sort((left, right) => {
+      const nameOrder = left.name.localeCompare(right.name, 'ja');
+      if (sortBy === 'level') return (left.level ?? 99) - (right.level ?? 99) || nameOrder;
+      if (sortBy === 'power') return (left.power ?? 99999) - (right.power ?? 99999) || nameOrder;
+      if (sortBy === 'type') return cardTypes.indexOf(left.cardType) - cardTypes.indexOf(right.cardType) || nameOrder;
+      if (sortBy === 'color') return colorOptions.findIndex((color) => left.color.includes(color)) - colorOptions.findIndex((color) => right.color.includes(color)) || nameOrder;
+      if (sortBy === 'name') return nameOrder;
+      return (cardOrder.get(left.id) ?? 0) - (cardOrder.get(right.id) ?? 0);
+    });
+  }, [levelMax, levelMin, powerMax, powerMin, query, selectedColors, selectedKeywords, selectedRarities, selectedReleases, selectedTypes, sortBy]);
   const visibleCards = useMemo(() => matchingCards.slice(0, catalogLimit), [catalogLimit, matchingCards]);
   const selectedCard = useMemo(() => cards.find((card) => card.id === selectedCardId) ?? null, [selectedCardId]);
   const selectedMainCount = selectedCard ? activeDeck.main[selectedCard.id] ?? 0 : 0;
   const selectedSideCount = selectedCard ? activeDeck.side[selectedCard.id] ?? 0 : 0;
+  const activeFilterCount = selectedTypes.length + selectedColors.length + selectedRarities.length + selectedReleases.length + selectedKeywords.length + Number(levelMin !== 0 || levelMax !== 17) + Number(powerMin !== 0 || powerMax !== 10000);
   const archive = useMemo<ArchiveData>(() => ({ version: 1, updatedAt: new Date().toISOString(), decks }), [decks]);
   const persist = async (token: string, sourceArchive = archive) => {
     setSyncState('syncing');
@@ -200,6 +256,10 @@ export default function Home() {
     adjustCard(selectedCard.id, pile, 1);
     setNotice(selectedCard.name + 'を' + (pile === 'main' ? 'メインデッキ' : 'サイドデッキ') + 'に追加しました。');
   };
+  const resetCardSearch = () => {
+    setQuery(''); setSelectedTypes([]); setSelectedColors([]); setSelectedRarities([]); setSelectedReleases([]); setSelectedKeywords([]);
+    setLevelMin(0); setLevelMax(17); setPowerMin(0); setPowerMax(10000); setSortBy('official'); setCatalogLimit(80);
+  };
   const createDeck = () => {
     const created = newDeck(decks.length + 1);
     setDecks((previous) => [created, ...previous]); setActiveDeckId(created.id);
@@ -247,7 +307,23 @@ export default function Home() {
             <div><p className="label">CARD CATALOG</p><h1 className="font-display mt-1 text-xl tracking-wide">カードを探す</h1></div>
             <div className="flex items-center gap-2"><span className="rounded-full bg-[var(--mist)] px-2 py-1 text-[11px] text-[var(--muted)]">{matchingCards.length}件</span><Button variant="ghost" size="sm" className="lg:hidden" onClick={() => setMobileCardsOpen(false)}>閉じる</Button></div>
           </div>
-          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => { setQuery(event.target.value); setCatalogLimit(80); }} placeholder="名前・色・収録・カード番号で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
+          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => { setQuery(event.target.value); setCatalogLimit(80); }} placeholder="名前・能力文・特性・カード番号で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
+          <details className="mb-3 rounded-xl border border-[var(--line)] bg-white/80">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium marker:content-none"><span>⌘ 条件で絞り込む</span><span className={activeFilterCount > 0 ? 'rounded-full bg-[var(--red)] px-2 py-0.5 text-[10px] text-white' : 'rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--muted)]'}>{activeFilterCount > 0 ? activeFilterCount + '件選択中' : 'すべて'}</span></summary>
+            <div className="space-y-4 border-t border-[var(--line)] px-3 pb-3 pt-3">
+              <div className="flex items-center justify-between gap-2"><p className="text-xs font-medium">絞り込み条件</p><Button size="xs" variant="ghost" className="text-[var(--red)]" onClick={resetCardSearch}>リセット</Button></div>
+              <FilterGroup label="種類">{cardTypes.map((type) => <FilterPill key={type} label={type} active={selectedTypes.includes(type)} onClick={() => { setSelectedTypes((values) => toggleFilterValue(values, type)); setCatalogLimit(80); }} />)}</FilterGroup>
+              <FilterGroup label="色">{colorOptions.map((color) => <FilterPill key={color} label={color === '無' ? '無色' : color} active={selectedColors.includes(color)} onClick={() => { setSelectedColors((values) => toggleFilterValue(values, color)); setCatalogLimit(80); }} />)}</FilterGroup>
+              <FilterGroup label="レアリティ">{rarityOptions.map((rarity) => <FilterPill key={rarity} label={rarity} active={selectedRarities.includes(rarity)} onClick={() => { setSelectedRarities((values) => toggleFilterValue(values, rarity)); setCatalogLimit(80); }} />)}</FilterGroup>
+              <FilterGroup label="収録">{releaseOptions.map((release) => <FilterPill key={release} label={releaseLabel(release)} active={selectedReleases.includes(release)} onClick={() => { setSelectedReleases((values) => toggleFilterValue(values, release)); setCatalogLimit(80); }} />)}</FilterGroup>
+              <FilterGroup label="特性・能力語・遺業">{abilityKeywordOptions.map((keyword) => <FilterPill key={keyword} label={keyword} active={selectedKeywords.includes(keyword)} onClick={() => { setSelectedKeywords((values) => toggleFilterValue(values, keyword)); setCatalogLimit(80); }} />)}</FilterGroup>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <RangeFilter label="レベル" min={levelMin} max={levelMax} ceiling={17} onMinChange={setLevelMin} onMaxChange={setLevelMax} />
+                <RangeFilter label="パワー（イジンのみ）" min={powerMin} max={powerMax} ceiling={10000} step={500} onMinChange={setPowerMin} onMaxChange={setPowerMax} />
+              </div>
+              <div><label htmlFor="card-sort" className="text-xs font-medium">並べ替え</label><select id="card-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortBy)} className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-white px-2 text-xs">{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+            </div>
+          </details>
           <div className="max-h-[calc(100vh-180px)] space-y-2 overflow-y-auto pr-1 lg:max-h-[calc(100vh-180px)]">
             {visibleCards.map((card) => {
               const inDeck = (activeDeck.main[card.id] ?? 0) + (activeDeck.side[card.id] ?? 0);
