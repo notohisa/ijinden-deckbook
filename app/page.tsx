@@ -141,6 +141,17 @@ function CardCounter({ label, count, onDecrease, onIncrease }: { label: string; 
   </section>;
 }
 
+function CatalogCardCounter({ label, count, onDecrease, onIncrease }: { label: string; count: number; onDecrease: () => void; onIncrease: () => void }) {
+  return <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
+    <h3 className="border-b border-[var(--line)] px-2 py-1 text-center text-[11px] font-medium tracking-wide text-[var(--muted)]">{label}</h3>
+    <div className="grid grid-cols-[1fr_1.1fr_1fr]">
+      <Button type="button" variant="ghost" disabled={count === 0} onClick={onDecrease} aria-label={label + 'から1枚減らす'} className="h-9 rounded-none border-r border-[var(--line)] text-lg text-[var(--muted)]">−</Button>
+      <output aria-label={label + 'に入っている枚数'} className="grid h-9 place-items-center font-display text-xl">{count}</output>
+      <Button type="button" variant="ghost" onClick={onIncrease} aria-label={label + 'に1枚追加する'} className="h-9 rounded-none border-l border-[var(--line)] text-lg text-[var(--ink)]">＋</Button>
+    </div>
+  </section>;
+}
+
 export default function Home() {
   const [decks, setDecks] = useState<Deck[]>([initialDeck]);
   const [activeDeckId, setActiveDeckId] = useState(initialDeck.id);
@@ -342,18 +353,26 @@ export default function Home() {
           </details>
           <div className="max-h-[calc(100vh-180px)] space-y-2 overflow-y-auto pr-1 lg:max-h-[calc(100vh-180px)]">
             {visibleCards.map((card) => {
-              const inDeck = (activeDeck.main[card.id] ?? 0) + (activeDeck.side[card.id] ?? 0);
-              return <button type="button" key={card.id} onClick={() => selectCard(card.id)} className="group w-full rounded-xl border border-transparent bg-[var(--soft)] p-3 text-left transition hover:border-[var(--line)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]">
-                <div className="flex items-start gap-3">
-                  <img src={card.imageUrl} alt={card.name + 'のカード画像'} loading="lazy" className="h-[92px] w-[66px] shrink-0 rounded-md border border-black/15 bg-white object-cover object-top shadow-sm" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.cardType} · {card.id} · {card.rarity} · {card.color} · Lv.{card.level ?? '-'}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">×{inDeck}</span>}</div>
-                    <p className="mt-1 text-[10px] text-[var(--muted)]">{card.release}{card.power !== null ? ' · パワー ' + card.power : ''}</p>
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">{card.description || card.trait || '公式カード情報'}</p>
-                    <p className="mt-2 text-[11px] font-medium text-[var(--red)]">タップして詳細・追加</p>
+              const mainInDeck = activeDeck.main[card.id] ?? 0;
+              const sideInDeck = activeDeck.side[card.id] ?? 0;
+              const inDeck = mainInDeck + sideInDeck;
+              return <article key={card.id} className="rounded-xl border border-transparent bg-[var(--soft)] p-3 transition hover:border-[var(--line)] hover:bg-white">
+                <button type="button" onClick={() => selectCard(card.id)} aria-label={card.name + 'の詳細を開く'} className="group w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]">
+                  <div className="flex items-start gap-3">
+                    <img src={card.imageUrl} alt={card.name + 'のカード画像'} loading="lazy" className="h-[92px] w-[66px] shrink-0 rounded-md border border-black/15 bg-white object-cover object-top shadow-sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.cardType} · {card.id} · {card.rarity} · {card.color} · Lv.{card.level ?? '-'}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">計×{inDeck}</span>}</div>
+                      <p className="mt-1 text-[10px] text-[var(--muted)]">{card.release}{card.power !== null ? ' · パワー ' + card.power : ''}</p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">{card.description || card.trait || '公式カード情報'}</p>
+                      <p className="mt-2 text-[11px] font-medium text-[var(--red)]">カード詳細を見る</p>
+                    </div>
                   </div>
+                </button>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <CatalogCardCounter label="メイン" count={mainInDeck} onDecrease={() => adjustCard(card.id, 'main', -1)} onIncrease={() => adjustCard(card.id, 'main', 1)} />
+                  <CatalogCardCounter label="サイド" count={sideInDeck} onDecrease={() => adjustCard(card.id, 'side', -1)} onIncrease={() => adjustCard(card.id, 'side', 1)} />
                 </div>
-              </button>;
+              </article>;
             })}
             {visibleCards.length === 0 && <p className="rounded-xl bg-[var(--soft)] px-3 py-8 text-center text-xs text-[var(--muted)]">一致するカードがありません。</p>}
             {visibleCards.length < matchingCards.length && <Button variant="outline" className="w-full border-[var(--line)] bg-white" onClick={() => setCatalogLimit((limit) => limit + 80)}>さらにカードを表示（残り {matchingCards.length - visibleCards.length}件）</Button>}
