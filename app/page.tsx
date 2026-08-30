@@ -9,6 +9,7 @@ type Pile = 'main' | 'side';
 type Card = IjindenCard;
 type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string };
 type ArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
+type AppTab = 'cards' | 'recipe' | 'myDecks' | 'help';
 
 const cards: Card[] = ijindenCards;
 const cardTypes = ['イジン', 'ハイケイ', 'マホウ', 'マリョク'] as const;
@@ -81,7 +82,7 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<SortBy>('official');
   const [catalogLimit, setCatalogLimit] = useState(80);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const [mobileCardsOpen, setMobileCardsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<AppTab>('cards');
   const [localDataReady, setLocalDataReady] = useState(false);
   const [notice, setNotice] = useState('カードを追加して、あなたの最初のデッキを作りましょう。');
   const activeDeck = decks.find((deck) => deck.id === activeDeckId) ?? decks[0];
@@ -160,7 +161,6 @@ export default function Home() {
   });
   const selectCard = (cardId: string) => {
     setSelectedCardId(cardId);
-    setMobileCardsOpen(false);
   };
   const resetCardSearch = () => {
     setQuery(''); setSelectedTypes([]); setSelectedColors([]); setSelectedRarities([]); setSelectedReleases([]); setSelectedKeywords([]);
@@ -168,7 +168,7 @@ export default function Home() {
   };
   const createDeck = () => {
     const created = newDeck(decks.length + 1);
-    setDecks((previous) => [created, ...previous]); setActiveDeckId(created.id);
+    setDecks((previous) => [created, ...previous]); setActiveDeckId(created.id); setActiveTab('recipe');
     setNotice('空のデッキを作成しました。');
   };
   const deleteDeck = () => {
@@ -198,13 +198,20 @@ export default function Home() {
             <Button variant="outline" size="sm" className="border-[var(--line)] bg-white/70" onClick={downloadBackup}>↓ バックアップ</Button>
           </div>
         </div>
+        <nav className="mx-auto max-w-[1180px] overflow-x-auto px-4 sm:px-6" aria-label="メインメニュー">
+          <div className="flex min-w-max gap-1" role="tablist" aria-label="デッキ帳のタブ">
+            {([
+              ['cards', 'カード'], ['recipe', 'レシピ'], ['myDecks', 'マイデッキ'], ['help', 'ヘルプ'],
+            ] as Array<[AppTab, string]>).map(([tab, label]) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)} className={'border-b-2 px-4 py-3 text-sm font-medium transition ' + (activeTab === tab ? 'border-[var(--red)] text-[var(--red)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]')}>{label}</button>)}
+          </div>
+        </nav>
       </header>
 
-      <div className="mx-auto grid max-w-[1480px] gap-5 px-4 py-5 lg:grid-cols-[minmax(290px,0.85fr)_minmax(420px,1.4fr)_minmax(240px,0.65fr)] lg:px-6">
-        <section className={(mobileCardsOpen ? 'fixed inset-x-0 bottom-0 top-16 z-40 block overflow-y-auto rounded-t-2xl border-t border-[var(--line)] bg-[#f4f0e7] p-3 shadow-[0_-12px_30px_rgb(33_38_45/0.12)] ' : 'hidden ') + 'lg:relative lg:inset-auto lg:z-auto lg:block lg:overflow-visible lg:rounded-2xl lg:border lg:border-[var(--line)] lg:bg-white/70 lg:shadow-[0_12px_30px_rgb(33_38_45/0.04)]'} aria-label="カードを探す">
+      <div className="mx-auto max-w-[1180px] px-4 py-5 sm:px-6">
+        {activeTab === 'cards' && <section className="rounded-2xl border border-[var(--line)] bg-white/70 p-3 shadow-[0_12px_30px_rgb(33_38_45/0.04)] sm:p-4" role="tabpanel" aria-label="カードを探す">
           <div className="mb-3 flex items-center justify-between gap-3 px-1 pt-1">
-            <div><p className="label">CARD CATALOG</p><h1 className="font-display mt-1 text-xl tracking-wide">カードを探す</h1></div>
-            <div className="flex items-center gap-2"><span className="rounded-full bg-[var(--mist)] px-2 py-1 text-[11px] text-[var(--muted)]">{matchingCards.length}件</span><Button variant="ghost" size="sm" className="lg:hidden" onClick={() => setMobileCardsOpen(false)}>閉じる</Button></div>
+            <div><p className="label">CARD CATALOG</p><h1 className="font-display mt-1 text-xl tracking-wide">カードを探す</h1><p className="mt-1 text-[11px] text-[var(--muted)]">編集中：{activeDeck.name || '名前のないデッキ'} · メイン {mainCount}枚 / サイド {sideCount}枚</p></div>
+            <span className="rounded-full bg-[var(--mist)] px-2 py-1 text-[11px] text-[var(--muted)]">{matchingCards.length}件</span>
           </div>
           <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => { setQuery(event.target.value); setCatalogLimit(80); }} placeholder="名前・能力文・特性・カード番号で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
           <details className="mb-3 rounded-xl border border-[var(--line)] bg-white/80">
@@ -249,9 +256,9 @@ export default function Home() {
             {visibleCards.length === 0 && <p className="rounded-xl bg-[var(--soft)] px-3 py-8 text-center text-xs text-[var(--muted)]">一致するカードがありません。</p>}
             {visibleCards.length < matchingCards.length && <Button variant="outline" className="w-full border-[var(--line)] bg-white" onClick={() => setCatalogLimit((limit) => limit + 80)}>さらにカードを表示（残り {matchingCards.length - visibleCards.length}件）</Button>}
           </div>
-        </section>
+        </section>}
 
-        <section className="min-w-0 rounded-2xl border border-[var(--line)] bg-white/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]" aria-label="編集中のデッキ">
+        {activeTab === 'recipe' && <section className="mx-auto min-w-0 max-w-4xl rounded-2xl border border-[var(--line)] bg-white/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]" role="tabpanel" aria-label="レシピ">
           <div className="border-b border-[var(--line)] px-4 py-4 sm:px-5">
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="label">NOW EDITING</p><Input aria-label="デッキ名" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="mt-1 h-auto border-0 bg-transparent px-0 py-0 font-display text-2xl tracking-[0.06em] shadow-none focus-visible:ring-0" /></div><Button variant="ghost" size="icon" className="shrink-0 text-[var(--muted)] hover:text-[var(--red)]" onClick={deleteDeck} aria-label="このデッキを削除">⌫</Button></div>
             <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--line)] rounded-xl border border-[var(--line)] bg-[var(--soft)]">
@@ -265,29 +272,36 @@ export default function Home() {
             </div>
           </div>
           <div className="p-4 sm:p-5">
-            <div className="mb-4 lg:hidden"><Button type="button" variant="outline" className="w-full border-[var(--line)] bg-[var(--paper)]" onClick={() => setMobileCardsOpen((open) => !open)}>⌕ {mobileCardsOpen ? 'カード一覧を閉じる' : 'カードを探して追加する'}</Button></div>
+            <div className="mb-4"><Button type="button" variant="outline" className="w-full border-[var(--line)] bg-[var(--paper)]" onClick={() => setActiveTab('cards')}>⌕ カードタブを開く</Button></div>
             <DeckPile title="メインデッキ" pile="main" deck={activeDeck} onAdjust={adjustCard} />
             <DeckPile title="サイドデッキ" pile="side" deck={activeDeck} onAdjust={adjustCard} />
           </div>
           <div className="border-t border-[var(--line)] bg-[var(--soft)] px-4 py-3 sm:px-5"><p className="flex items-start gap-2 text-xs leading-5 text-[var(--muted)]"><span className="text-[var(--green)]">●</span>{notice}</p></div>
-        </section>
+        </section>}
 
-        <aside className="space-y-4">
+        {activeTab === 'myDecks' && <section className="mx-auto max-w-2xl space-y-4" role="tabpanel" aria-label="マイデッキ">
           <section className="rounded-2xl border border-[var(--line)] bg-white/75 p-3">
             <div className="mb-2 flex items-center justify-between px-1 pt-1"><div><p className="label">MY DECKS</p><h2 className="font-display mt-1 text-lg tracking-wide">マイデッキ</h2></div><Button size="icon-sm" variant="outline" className="border-[var(--line)]" onClick={createDeck} aria-label="新しいデッキ">＋</Button></div>
             <div className="space-y-1">{decks.map((deck) => {
               const isActive = deck.id === activeDeckId;
-              return <button type="button" key={deck.id} onClick={() => setActiveDeckId(deck.id)} className={'w-full rounded-xl px-3 py-2.5 text-left transition ' + (isActive ? 'bg-[var(--mist)] ring-1 ring-[var(--line)]' : 'hover:bg-[var(--soft)]')}>
+              return <button type="button" key={deck.id} onClick={() => { setActiveDeckId(deck.id); setActiveTab('recipe'); }} className={'w-full rounded-xl px-3 py-2.5 text-left transition ' + (isActive ? 'bg-[var(--mist)] ring-1 ring-[var(--line)]' : 'hover:bg-[var(--soft)]')}>
                 <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span>{isActive && <span className="shrink-0 text-[var(--green)]">✓</span>}</span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span>
               </button>;
             })}</div>
           </section>
-          <section className="rounded-2xl border border-dashed border-[var(--line)] bg-white/60 p-4 text-xs leading-5 text-[var(--muted)]">
-            <p className="font-medium text-[var(--ink)]">公式カードデータについて</p>
-            <p className="mt-1">全576種の名称・能力文と画像は、イジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p>
-            <a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a>
-          </section>
-        </aside>
+        </section>}
+
+        {activeTab === 'help' && <section className="mx-auto max-w-3xl rounded-2xl border border-[var(--line)] bg-white/80 p-5 text-sm leading-7 shadow-[0_12px_30px_rgb(33_38_45/0.04)] sm:p-7" role="tabpanel" aria-label="ヘルプ">
+          <p className="label">HELP</p>
+          <h1 className="mt-1 font-display text-2xl tracking-wide">デッキ帳の使い方</h1>
+          <div className="mt-6 space-y-6">
+            <section><h2 className="font-display text-lg">カード</h2><p className="mt-1 text-[var(--muted)]">名前・能力文・特性・カード番号から探せます。各カードのメイン／サイドの＋・−で、その場で枚数を調整できます。</p></section>
+            <section><h2 className="font-display text-lg">レシピ</h2><p className="mt-1 text-[var(--muted)]">編集中のデッキの合計枚数、種類別枚数、メインデッキ、サイドデッキを確認・調整できます。メイン40枚で完成表示になります。</p></section>
+            <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">新しいデッキの作成と、保存したデッキの切り替えを行えます。デッキはこのブラウザ内に保存されます。</p></section>
+            <section><h2 className="font-display text-lg">バックアップ</h2><p className="mt-1 text-[var(--muted)]">上部の「バックアップ」から、現在のマイデッキをJSONファイルとして控えられます。ブラウザのデータを消す前に作成してください。</p></section>
+            <section className="rounded-xl bg-[var(--soft)] p-4 text-xs text-[var(--muted)]"><p className="font-medium text-[var(--ink)]">公式カードデータについて</p><p className="mt-1">全576種の名称・能力文と画像はイジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p><a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a></section>
+          </div>
+        </section>}
       </div>
       {selectedCard && <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-0 sm:place-items-center sm:p-5" role="dialog" aria-modal="true" aria-label={selectedCard.name + 'を追加'}>
         <button type="button" className="absolute inset-0 cursor-default" aria-label="カード詳細を閉じる" onClick={() => setSelectedCardId(null)} />
