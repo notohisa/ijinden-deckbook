@@ -7,7 +7,7 @@ import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
 
 type Pile = 'main' | 'side';
 type Card = IjindenCard;
-type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string };
+type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string; isSaved?: boolean };
 type ArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'help';
 
@@ -32,7 +32,7 @@ const rarityOptions = Array.from(new Set(cards.map((card) => card.rarity))).sort
 const maxCardLevel = Math.max(17, ...cards.map((card) => card.level ?? 0));
 const maxCardPower = Math.max(10000, ...cards.map((card) => card.cardType === 'イジン' ? card.power ?? 0 : 0));
 const powerFilterCeiling = Math.ceil(maxCardPower / 500) * 500;
-const initialDeck: Deck = { id: 'new-deck', name: '新しいデッキ', main: {}, side: {}, updatedAt: new Date().toISOString() };
+const initialDeck: Deck = { id: 'new-deck', name: '新しいデッキ', main: {}, side: {}, updatedAt: new Date().toISOString(), isSaved: false };
 const localStorageKey = 'ijinden-deckbook-v1';
 const countCards = (cardsInPile: Record<string, number>) => Object.values(cardsInPile).reduce((total, count) => total + count, 0);
 const toggleFilterValue = <T,>(values: T[], value: T) => values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
@@ -47,7 +47,7 @@ const countByCardType = (cardsInPile: Record<string, number>) => {
 };
 
 function newDeck(index: number): Deck {
-  return { id: crypto.randomUUID(), name: '新しいデッキ ' + String(index), main: {}, side: {}, updatedAt: new Date().toISOString() };
+  return { id: crypto.randomUUID(), name: '新しいデッキ ' + String(index), main: {}, side: {}, updatedAt: new Date().toISOString(), isSaved: false };
 }
 
 function FilterPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
@@ -94,6 +94,7 @@ export default function Home() {
   const [localDataReady, setLocalDataReady] = useState(false);
   const [notice, setNotice] = useState('カードを追加して、あなたの最初のデッキを作りましょう。');
   const activeDeck = decks.find((deck) => deck.id === activeDeckId) ?? decks[0];
+  const savedDecks = useMemo(() => decks.filter((deck) => deck.isSaved), [decks]);
   const mainCount = countCards(activeDeck.main);
   const sideCount = countCards(activeDeck.side);
   const mainTypeCounts = countByCardType(activeDeck.main);
@@ -174,6 +175,14 @@ export default function Home() {
     if (next === 0) delete currentPile[cardId]; else currentPile[cardId] = next;
     return { ...deck, [pile]: currentPile };
   });
+  const saveActiveDeck = () => {
+    if (mainCount + sideCount === 0) {
+      setNotice('空のデッキはマイデッキに保存できません。カードを追加してから保存してください。');
+      return;
+    }
+    updateActiveDeck((deck) => ({ ...deck, isSaved: true }));
+    setNotice('「' + (activeDeck.name || '名前のないデッキ') + '」をマイデッキに保存しました。');
+  };
   const selectCard = (cardId: string) => {
     setSelectedCardId(cardId);
   };
@@ -278,7 +287,7 @@ export default function Home() {
 
         {activeTab === 'recipe' && <section className="mx-auto min-w-0 max-w-4xl rounded-2xl border border-[var(--line)] bg-white/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]" role="tabpanel" aria-label="レシピ">
           <div className="border-b border-[var(--line)] px-4 py-4 sm:px-5">
-            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="label">NOW EDITING</p><Input aria-label="デッキ名" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="mt-1 h-auto border-0 bg-transparent px-0 py-0 font-display text-2xl tracking-[0.06em] shadow-none focus-visible:ring-0" /></div><Button variant="ghost" size="icon" className="shrink-0 text-[var(--muted)] hover:text-[var(--red)]" onClick={deleteDeck} aria-label="このデッキを削除">⌫</Button></div>
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="label">NOW EDITING</p><Input aria-label="デッキ名" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="mt-1 h-auto border-0 bg-transparent px-0 py-0 font-display text-2xl tracking-[0.06em] shadow-none focus-visible:ring-0" /></div><div className="flex shrink-0 items-center gap-1"><Button size="sm" className="bg-[var(--green)] text-white hover:bg-[var(--green)]/85" onClick={saveActiveDeck}>マイデッキに保存</Button><Button variant="ghost" size="icon" className="text-[var(--muted)] hover:text-[var(--red)]" onClick={deleteDeck} aria-label="このデッキを削除">⌫</Button></div></div>
             <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--line)] rounded-xl border border-[var(--line)] bg-[var(--soft)]">
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">MAIN</p><p className="font-display text-2xl">{mainCount}</p></div>
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">SIDE</p><p className="font-display text-2xl">{sideCount}</p></div>
@@ -291,8 +300,8 @@ export default function Home() {
           </div>
           <div className="p-4 sm:p-5">
             <div className="mb-4"><Button type="button" variant="outline" className="w-full border-[var(--line)] bg-[var(--paper)]" onClick={() => setActiveTab('cards')}>⌕ カードタブを開く</Button></div>
-            <DeckPile title="メインデッキ" pile="main" deck={activeDeck} onAdjust={adjustCard} />
-            <DeckPile title="サイドデッキ" pile="side" deck={activeDeck} onAdjust={adjustCard} />
+            <DeckPile title="メインデッキ" pile="main" deck={activeDeck} />
+            <DeckPile title="サイドデッキ" pile="side" deck={activeDeck} />
           </div>
           <div className="border-t border-[var(--line)] bg-[var(--soft)] px-4 py-3 sm:px-5"><p className="flex items-start gap-2 text-xs leading-5 text-[var(--muted)]"><span className="text-[var(--green)]">●</span>{notice}</p></div>
         </section>}
@@ -300,12 +309,12 @@ export default function Home() {
         {activeTab === 'myDecks' && <section className="mx-auto max-w-2xl space-y-4" role="tabpanel" aria-label="マイデッキ">
           <section className="rounded-2xl border border-[var(--line)] bg-white/75 p-3">
             <div className="mb-2 flex items-center justify-between px-1 pt-1"><div><p className="label">MY DECKS</p><h2 className="font-display mt-1 text-lg tracking-wide">マイデッキ</h2></div><Button size="icon-sm" variant="outline" className="border-[var(--line)]" onClick={createDeck} aria-label="新しいデッキ">＋</Button></div>
-            <div className="space-y-1">{decks.map((deck) => {
+            {savedDecks.length === 0 ? <p className="rounded-xl bg-[var(--soft)] px-3 py-7 text-center text-xs leading-5 text-[var(--muted)]">保存済みのデッキはありません。<br />レシピタブの「マイデッキに保存」から追加できます。</p> : <div className="space-y-1">{savedDecks.map((deck) => {
               const isActive = deck.id === activeDeckId;
               return <button type="button" key={deck.id} onClick={() => { setActiveDeckId(deck.id); setActiveTab('recipe'); }} className={'w-full rounded-xl px-3 py-2.5 text-left transition ' + (isActive ? 'bg-[var(--mist)] ring-1 ring-[var(--line)]' : 'hover:bg-[var(--soft)]')}>
                 <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span>{isActive && <span className="shrink-0 text-[var(--green)]">✓</span>}</span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span>
               </button>;
-            })}</div>
+            })}</div>}
           </section>
         </section>}
 
@@ -314,8 +323,8 @@ export default function Home() {
           <h1 className="mt-1 font-display text-2xl tracking-wide">デッキ帳の使い方</h1>
           <div className="mt-6 space-y-6">
             <section><h2 className="font-display text-lg">カード</h2><p className="mt-1 text-[var(--muted)]">名前・能力文・特性・カード番号から探せます。各カードのメイン／サイドの＋・−で、その場で枚数を調整できます。</p></section>
-            <section><h2 className="font-display text-lg">レシピ</h2><p className="mt-1 text-[var(--muted)]">編集中のデッキの合計枚数、種類別枚数、メインデッキ、サイドデッキを確認・調整できます。メイン40枚で完成表示になります。</p></section>
-            <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">新しいデッキの作成と、保存したデッキの切り替えを行えます。デッキはこのブラウザ内に保存されます。</p></section>
+            <section><h2 className="font-display text-lg">レシピ</h2><p className="mt-1 text-[var(--muted)]">編集中のデッキの合計枚数、種類別枚数、メインデッキ、サイドデッキを確認できます。レシピのカード画像左下に枚数を表示します。メイン40枚で完成表示になります。</p></section>
+            <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">レシピタブで「マイデッキに保存」を押したデッキだけを表示します。保存したデッキの切り替えと、新しいデッキの作成を行えます。</p></section>
             <section><h2 className="font-display text-lg">バックアップ</h2><p className="mt-1 text-[var(--muted)]">上部の「バックアップ」から、現在のマイデッキをJSONファイルとして控えられます。ブラウザのデータを消す前に作成してください。</p></section>
             <section className="rounded-xl bg-[var(--soft)] p-4 text-xs text-[var(--muted)]"><p className="font-medium text-[var(--ink)]">公式カードデータについて</p><p className="mt-1">全576種の名称・能力文と画像はイジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p><a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a></section>
           </div>
@@ -345,21 +354,22 @@ export default function Home() {
   );
 }
 
-function DeckPile({ title, pile, deck, onAdjust }: {
-  title: string; pile: Pile; deck: Deck;
-  onAdjust: (cardId: string, pile: Pile, difference: number) => void;
-}) {
+function DeckPile({ title, pile, deck }: { title: string; pile: Pile; deck: Deck }) {
   const entries = Object.entries(deck[pile])
     .map(([cardId, count]) => ({ card: cards.find((card) => card.id === cardId), count }))
-    .filter((entry): entry is { card: Card; count: number } => Boolean(entry.card));
+    .filter((entry): entry is { card: Card; count: number } => Boolean(entry.card))
+    .sort((left, right) => cardTypes.indexOf(left.card.cardType) - cardTypes.indexOf(right.card.cardType)
+      || (left.card.level ?? 99) - (right.card.level ?? 99)
+      || colorOptions.findIndex((color) => left.card.color.includes(color)) - colorOptions.findIndex((color) => right.card.color.includes(color))
+      || (left.card.power ?? 99999) - (right.card.power ?? 99999)
+      || (cardOrder.get(left.card.id) ?? 0) - (cardOrder.get(right.card.id) ?? 0));
   return <section className="mb-6 last:mb-0">
     <div className="mb-2 flex items-center justify-between"><h2 className="font-display text-lg tracking-wide">{title}</h2><span className="text-xs text-[var(--muted)]">{countCards(deck[pile])}枚</span></div>
-    {entries.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--soft)] px-4 py-6 text-center text-xs text-[var(--muted)]">左のカード一覧から追加してください</div> : <div className="overflow-hidden rounded-xl border border-[var(--line)]">
-      {entries.map(({ card, count }) => <div key={card.id} className="flex items-center gap-3 border-b border-[var(--line)] bg-white px-3 py-2.5 last:border-b-0">
-        <img src={card.imageUrl} alt="" className="size-9 shrink-0 rounded border border-black/15 bg-white object-cover object-top" />
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{card.name}</p><p className="text-[10px] text-[var(--muted)]">{card.cardType} · {card.id} · {card.rarity} · {card.color}</p></div>
-        <div className="flex items-center gap-1"><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, -1)} aria-label={card.name + 'を1枚減らす'}>−</Button><span className="w-5 text-center font-display text-lg">{count}</span><Button size="icon-xs" variant="ghost" onClick={() => onAdjust(card.id, pile, 1)} aria-label={card.name + 'を1枚増やす'}>＋</Button></div>
-      </div>)}
-    </div>}
+    {entries.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--soft)] px-4 py-6 text-center text-xs text-[var(--muted)]">カードタブから追加してください</div> : <ul className="flex flex-wrap gap-2" aria-label={title + 'のカード一覧'}>
+      {entries.map(({ card, count }) => <li key={card.id} className="relative h-[112px] w-[80px] overflow-hidden rounded-md border border-black/15 bg-white shadow-sm">
+        <img src={card.imageUrl} alt={card.name} loading="lazy" className="h-full w-full object-cover object-top" />
+        <output aria-label={card.name + '：' + count + '枚'} className="absolute bottom-0 left-0 min-w-6 rounded-tr-md border-r border-t border-black/30 bg-white px-1.5 py-0.5 text-center font-display text-sm leading-none text-[var(--ink)]">{count}</output>
+      </li>)}
+    </ul>}
   </section>;
 }
