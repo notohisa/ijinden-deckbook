@@ -232,7 +232,12 @@ export default function Home() {
       setNotice('空のデッキはマイデッキに保存できません。カードを追加してから保存してください。');
       return;
     }
-    const savedDeck = { ...activeDeck, id: crypto.randomUUID(), main: { ...activeDeck.main }, side: { ...activeDeck.side }, updatedAt: new Date().toISOString(), isSaved: true };
+    const name = normalizedDeckName(activeDeck.name);
+    if (decks.some((deck) => normalizedDeckName(deck.name) === name)) {
+      setNotice('同名のデッキはマイデッキに保存できません。デッキ名を変更してください。');
+      return;
+    }
+    const savedDeck = { ...activeDeck, id: crypto.randomUUID(), name, main: { ...activeDeck.main }, side: { ...activeDeck.side }, updatedAt: new Date().toISOString(), isSaved: true };
     setDecks((previous) => [savedDeck, ...previous]);
     setNotice('「' + (activeDeck.name || '名前のないデッキ') + '」をマイデッキに保存しました。');
   };
@@ -254,8 +259,13 @@ export default function Home() {
   };
   const saveDeckName = () => {
     if (!renamingDeckId) return;
+    const name = normalizedDeckName(renamingDeckName);
+    if (decks.some((deck) => deck.id !== renamingDeckId && normalizedDeckName(deck.name) === name)) {
+      setNotice('同名のデッキには変更できません。別のデッキ名を入力してください。');
+      return;
+    }
     setDecks((previous) => previous.map((deck) => deck.id === renamingDeckId
-      ? { ...deck, name: renamingDeckName.trim(), updatedAt: new Date().toISOString() } : deck));
+      ? { ...deck, name, updatedAt: new Date().toISOString() } : deck));
     setRenamingDeckId(null);
     setNotice('デッキ名を変更しました。');
   };
