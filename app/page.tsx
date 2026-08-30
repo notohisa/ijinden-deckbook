@@ -84,6 +84,10 @@ function parseImportedDeck(value: unknown): Deck | null {
   };
 }
 
+function normalizedDeckName(name: string) {
+  return name.trim();
+}
+
 function FilterPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return <Button type="button" size="xs" variant="outline" aria-pressed={active} onClick={onClick} className={active ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85 hover:text-[var(--paper)]' : 'border-[var(--line)] bg-white'}>{label}</Button>;
 }
@@ -296,17 +300,28 @@ export default function Home() {
       const importedDecks = source.decks.map(parseImportedDeck).filter((deck): deck is Deck => deck !== null);
       if (importedDecks.length === 0) throw new Error('empty export');
       const merged = new Map(decks.map((deck) => [deck.id, deck]));
+      const deckIdByName = new Map(
+        decks
+          .map((deck) => [normalizedDeckName(deck.name), deck.id] as const)
+          .filter(([name]) => name.length > 0),
+      );
       let added = 0;
       let updated = 0;
       for (const deck of importedDecks) {
-        const current = merged.get(deck.id);
-        if (!current) {
-          merged.set(deck.id, deck);
+        const name = normalizedDeckName(deck.name);
+        const existingId = (name ? deckIdByName.get(name) : undefined) ?? (merged.has(deck.id) ? deck.id : undefined);
+        if (!existingId) {
+          merged.set(deck.id, { ...deck, name });
+          if (name) deckIdByName.set(name, deck.id);
           added += 1;
-        } else if (Date.parse(deck.updatedAt) > Date.parse(current.updatedAt)) {
-          merged.set(deck.id, deck);
-          updated += 1;
+          continue;
         }
+        const current = merged.get(existingId);
+        const previousName = current ? normalizedDeckName(current.name) : '';
+        if (previousName && previousName !== name) deckIdByName.delete(previousName);
+        merged.set(existingId, { ...deck, id: existingId, name, updatedAt: new Date().toISOString(), isSaved: true });
+        if (name) deckIdByName.set(name, existingId);
+        updated += 1;
       }
       setDecks(Array.from(merged.values()).sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)));
       setNotice('マイデッキを読み込みました。新規 ' + String(added) + '件・更新 ' + String(updated) + '件です。');
@@ -435,7 +450,7 @@ export default function Home() {
             <section><h2 className="font-display text-lg">カード</h2><p className="mt-1 text-[var(--muted)]">名前・能力文・特性・カード番号から探せます。各カードのメイン／サイドの＋・−で、その場で枚数を調整できます。</p></section>
             <section><h2 className="font-display text-lg">レシピ</h2><p className="mt-1 text-[var(--muted)]">編集中のデッキの合計枚数、種類別枚数、メインデッキ、サイドデッキを確認できます。レシピのカード画像左下に枚数を表示します。メイン40枚で完成表示になります。</p></section>
             <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">レシピタブで「マイデッキに保存」を押したデッキだけを表示します。保存済みデッキの切り替え、名前変更、削除、新しいデッキの作成を行えます。</p></section>
-            <section><h2 className="font-display text-lg">エクスポート・インポート</h2><p className="mt-1 text-[var(--muted)]">この端末では、保存済みマイデッキと作業中レシピを自動保存します。上部の「エクスポート」で保存済みマイデッキだけをJSONファイルに出力し、別の端末で「インポート」すると追加・更新できます。作業中レシピは出力されません。</p></section>
+            <section><h2 className="font-display text-lg">エクスポート・インポート</h2><p className="mt-1 text-[var(--muted)]">この端末では、保存済みマイデッキと作業中レシピを自動保存します。上部の「エクスポート」で保存済みマイデッキだけをJSONファイルに出力し、別の端末で「インポート」すると追加・更新できます。同じ名前の保存済みデッキがある場合は、インポートした内容で上書きします。作業中レシピは出力されません。</p></section>
             <section className="rounded-xl bg-[var(--soft)] p-4 text-xs text-[var(--muted)]"><p className="font-medium text-[var(--ink)]">公式カードデータについて</p><p className="mt-1">全576種の名称・能力文と画像はイジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p><a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a></section>
           </div>
         </section>}
