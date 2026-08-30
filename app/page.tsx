@@ -15,11 +15,15 @@ const cards: Card[] = ijindenCards;
 const cardTypes = ['イジン', 'ハイケイ', 'マホウ', 'マリョク'] as const;
 type CardType = (typeof cardTypes)[number];
 type SortBy = 'official' | 'level' | 'power' | 'type' | 'color' | 'name';
+type SortDirection = 'asc' | 'desc';
 const colorOptions = ['赤', '青', '緑', '黄', '紫', '無'] as const;
 const abilityKeywordOptions = ['剣術', '美術', '音楽', '思想', '医術', '志願', '航海', '執筆', '決起', '徴募', '魔導', '勝鬨', '躍進', '魔力化', '冥府発動', '復元', '反魂', '木霊', '喪神'];
 const sortOptions: Array<{ value: SortBy; label: string }> = [
   { value: 'official', label: '公式順' }, { value: 'level', label: 'レベル順' }, { value: 'power', label: 'パワー順' },
   { value: 'type', label: '種類順' }, { value: 'color', label: '色順' }, { value: 'name', label: '名前順' },
+];
+const sortDirectionOptions: Array<{ value: SortDirection; label: string }> = [
+  { value: 'asc', label: '昇順' }, { value: 'desc', label: '降順' },
 ];
 const cardsById = new Map(cards.map((card) => [card.id, card]));
 const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
@@ -83,6 +87,7 @@ export default function Home() {
   const [powerMin, setPowerMin] = useState(0);
   const [powerMax, setPowerMax] = useState(powerFilterCeiling);
   const [sortBy, setSortBy] = useState<SortBy>('official');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [catalogLimit, setCatalogLimit] = useState(80);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
@@ -112,15 +117,22 @@ export default function Home() {
       );
     });
     return filtered.sort((left, right) => {
+      const compareOptionalNumber = (leftValue: number | null, rightValue: number | null) => {
+        if (leftValue === null) return rightValue === null ? 0 : 1;
+        if (rightValue === null) return -1;
+        return leftValue - rightValue;
+      };
       const nameOrder = left.name.localeCompare(right.name, 'ja');
-      if (sortBy === 'level') return (left.level ?? 99) - (right.level ?? 99) || nameOrder;
-      if (sortBy === 'power') return (left.power ?? 99999) - (right.power ?? 99999) || nameOrder;
-      if (sortBy === 'type') return cardTypes.indexOf(left.cardType) - cardTypes.indexOf(right.cardType) || nameOrder;
-      if (sortBy === 'color') return colorOptions.findIndex((color) => left.color.includes(color)) - colorOptions.findIndex((color) => right.color.includes(color)) || nameOrder;
-      if (sortBy === 'name') return nameOrder;
-      return (cardOrder.get(left.id) ?? 0) - (cardOrder.get(right.id) ?? 0);
+      let order = 0;
+      if (sortBy === 'level') order = compareOptionalNumber(left.level, right.level) || nameOrder;
+      else if (sortBy === 'power') order = compareOptionalNumber(left.power, right.power) || nameOrder;
+      else if (sortBy === 'type') order = cardTypes.indexOf(left.cardType) - cardTypes.indexOf(right.cardType) || nameOrder;
+      else if (sortBy === 'color') order = colorOptions.findIndex((color) => left.color.includes(color)) - colorOptions.findIndex((color) => right.color.includes(color)) || nameOrder;
+      else if (sortBy === 'name') order = nameOrder;
+      else order = (cardOrder.get(left.id) ?? 0) - (cardOrder.get(right.id) ?? 0);
+      return sortDirection === 'asc' ? order : -order;
     });
-  }, [levelMax, levelMin, powerMax, powerMin, query, selectedColors, selectedKeywords, selectedRarities, selectedReleases, selectedTypes, sortBy]);
+  }, [levelMax, levelMin, powerMax, powerMin, query, selectedColors, selectedKeywords, selectedRarities, selectedReleases, selectedTypes, sortBy, sortDirection]);
   const visibleCards = useMemo(() => matchingCards.slice(0, catalogLimit), [catalogLimit, matchingCards]);
   const selectedCard = useMemo(() => cards.find((card) => card.id === selectedCardId) ?? null, [selectedCardId]);
   const activeFilterCount = selectedTypes.length + selectedColors.length + selectedRarities.length + selectedReleases.length + selectedKeywords.length + Number(levelMin !== 0 || levelMax !== maxCardLevel) + Number(powerMin !== 0 || powerMax !== powerFilterCeiling);
@@ -167,7 +179,7 @@ export default function Home() {
   };
   const resetCardSearch = () => {
     setQuery(''); setSelectedTypes([]); setSelectedColors([]); setSelectedRarities([]); setSelectedReleases([]); setSelectedKeywords([]);
-    setLevelMin(0); setLevelMax(maxCardLevel); setPowerMin(0); setPowerMax(powerFilterCeiling); setSortBy('official'); setCatalogLimit(80);
+    setLevelMin(0); setLevelMax(maxCardLevel); setPowerMin(0); setPowerMax(powerFilterCeiling); setSortBy('official'); setSortDirection('asc'); setCatalogLimit(80);
   };
   const createDeck = () => {
     const created = newDeck(decks.length + 1);
@@ -230,7 +242,10 @@ export default function Home() {
                 <RangeFilter label="レベル" min={levelMin} max={levelMax} ceiling={maxCardLevel} onMinChange={setLevelMin} onMaxChange={setLevelMax} />
                 <RangeFilter label="パワー（イジンのみ）" min={powerMin} max={powerMax} ceiling={powerFilterCeiling} step={500} onMinChange={setPowerMin} onMaxChange={setPowerMax} />
               </div>
-              <div><label htmlFor="card-sort" className="text-xs font-medium">並べ替え</label><select id="card-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortBy)} className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-white px-2 text-xs">{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
+                <div><label htmlFor="card-sort" className="text-xs font-medium">並べ替え</label><select id="card-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortBy)} className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-white px-2 text-xs">{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+                <div><label htmlFor="card-sort-direction" className="text-xs font-medium">順序</label><select id="card-sort-direction" value={sortDirection} onChange={(event) => setSortDirection(event.target.value as SortDirection)} className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-white px-2 text-xs">{sortDirectionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+              </div>
             </div>
           </details>
           <div className="max-h-[calc(100vh-180px)] space-y-2 overflow-y-auto pr-1 lg:max-h-[calc(100vh-180px)]">
