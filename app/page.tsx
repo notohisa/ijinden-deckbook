@@ -8,7 +8,8 @@ import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
 type Pile = 'main' | 'side';
 type Card = IjindenCard;
 type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string; isSaved?: boolean };
-type ArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
+type ArchiveData = { version: 2; updatedAt: string; decks: Deck[]; draft: Deck };
+type LegacyArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'help';
 
 const cards: Card[] = ijindenCards;
@@ -50,6 +51,10 @@ function newDeck(index: number): Deck {
   return { id: crypto.randomUUID(), name: '新しいデッキ ' + String(index), main: {}, side: {}, updatedAt: new Date().toISOString(), isSaved: false };
 }
 
+function copyDeckAsDraft(deck: Deck): Deck {
+  return { ...deck, id: crypto.randomUUID(), main: { ...deck.main }, side: { ...deck.side }, updatedAt: new Date().toISOString(), isSaved: false };
+}
+
 function FilterPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return <Button type="button" size="xs" variant="outline" aria-pressed={active} onClick={onClick} className={active ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85 hover:text-[var(--paper)]' : 'border-[var(--line)] bg-white'}>{label}</Button>;
 }
@@ -74,8 +79,8 @@ function CatalogCardCounter({ label, count, onDecrease, onIncrease }: { label: s
 }
 
 export default function Home() {
-  const [decks, setDecks] = useState<Deck[]>([initialDeck]);
-  const [activeDeckId, setActiveDeckId] = useState(initialDeck.id);
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [activeDeck, setActiveDeck] = useState<Deck>(initialDeck);
   const [query, setQuery] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<CardType[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
@@ -95,8 +100,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
   const [localDataReady, setLocalDataReady] = useState(false);
   const [notice, setNotice] = useState('カードを追加して、あなたの最初のデッキを作りましょう。');
-  const activeDeck = decks.find((deck) => deck.id === activeDeckId) ?? decks[0];
-  const savedDecks = useMemo(() => decks.filter((deck) => deck.isSaved), [decks]);
+  const savedDecks = decks;
   const mainCount = countCards(activeDeck.main);
   const sideCount = countCards(activeDeck.side);
   const mainTypeCounts = countByCardType(activeDeck.main);
@@ -139,17 +143,22 @@ export default function Home() {
   const visibleCards = useMemo(() => matchingCards.slice(0, catalogLimit), [catalogLimit, matchingCards]);
   const selectedCard = useMemo(() => cards.find((card) => card.id === selectedCardId) ?? null, [selectedCardId]);
   const activeFilterCount = selectedTypes.length + selectedColors.length + selectedRarities.length + selectedReleases.length + selectedKeywords.length + Number(levelMin !== 0 || levelMax !== maxCardLevel) + Number(powerMin !== 0 || powerMax !== powerFilterCeiling);
-  const archive = useMemo<ArchiveData>(() => ({ version: 1, updatedAt: new Date().toISOString(), decks }), [decks]);
+  const archive = useMemo<ArchiveData>(() => ({ version: 2, updatedAt: new Date().toISOString(), decks, draft: activeDeck }), [activeDeck, decks]);
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(localStorageKey);
       if (!saved) return;
-      const savedArchive = JSON.parse(saved) as ArchiveData;
-      if (savedArchive.version === 1 && savedArchive.decks.length > 0) {
+      const savedArchive = JSON.parse(saved) as ArchiveData | LegacyArchiveData;
+      if (savedArchive.version === 2) {
         setDecks(savedArchive.decks);
-        setActiveDeckId(savedArchive.decks[0].id);
-        setNotice('この端末に保存したマイデッキを読み込みました。');
+        setActiveDeck({ ...savedArchive.draft, main: { ...savedArchive.draft.main }, side: { ...savedArchive.draft.side }, isSaved: false });
+        setNotice('保存済みデッキと作業中のレシピを読み込みました。');
+      } else if (savedArchive.version === 1 && savedArchive.decks.length > 0) {
+        const legacyDraft = savedArchive.decks.find((deck) => !deck.isSaved);
+        setDecks(savedArchive.decks.filter((deck) => deck.isSaved));
+        if (legacyDraft) setActiveDeck(copyDeckAsDraft(legacyDraft));
+        setNotice('保存済みデッキを読み込みました。');
       }
     } catch {
       setNotice('この端末の保存データを読み込めませんでした。');
@@ -167,10 +176,7 @@ export default function Home() {
     }
   }, [archive, localDataReady]);
 
-  const updateActiveDeck = (updater: (deck: Deck) => Deck) => setDecks((previous) =>
-    previous.map((deck) => deck.id === activeDeckId
-      ? { ...updater(deck), updatedAt: new Date().toISOString() } : deck),
-  );
+  const updateActiveDeck = (updater: (deck: Deck) => Deck) => setActiveDeck((previous) => ({ ...updater(previous), updatedAt: new Date().toISOString(), isSaved: false }));
   const adjustCard = (cardId: string, pile: Pile, difference: number) => updateActiveDeck((deck) => {
     const currentPile = { ...deck[pile] };
     const next = Math.max(0, (currentPile[cardId] ?? 0) + difference);
@@ -191,7 +197,8 @@ export default function Home() {
       setNotice('空のデッキはマイデッキに保存できません。カードを追加してから保存してください。');
       return;
     }
-    updateActiveDeck((deck) => ({ ...deck, isSaved: true }));
+    const savedDeck = { ...activeDeck, id: crypto.randomUUID(), main: { ...activeDeck.main }, side: { ...activeDeck.side }, updatedAt: new Date().toISOString(), isSaved: true };
+    setDecks((previous) => [savedDeck, ...previous]);
     setNotice('「' + (activeDeck.name || '名前のないデッキ') + '」をマイデッキに保存しました。');
   };
   const selectCard = (cardId: string) => {
@@ -203,7 +210,7 @@ export default function Home() {
   };
   const createDeck = () => {
     const created = newDeck(decks.length + 1);
-    setDecks((previous) => [created, ...previous]); setActiveDeckId(created.id); setActiveTab('recipe');
+    setActiveDeck(created); setActiveTab('recipe');
     setNotice('空のデッキを作成しました。');
   };
   const startRenamingDeck = (deck: Deck) => {
@@ -220,10 +227,7 @@ export default function Home() {
   const deleteSavedDeck = (deckId: string) => {
     const deck = decks.find((item) => item.id === deckId);
     if (!deck || !window.confirm('「' + (deck.name || '名前のないデッキ') + '」を削除しますか？')) return;
-    const remaining = decks.filter((item) => item.id !== deckId);
-    const fallback = remaining[0] ?? newDeck(1);
-    setDecks(remaining.length > 0 ? remaining : [fallback]);
-    if (activeDeckId === deckId) setActiveDeckId(fallback.id);
+    setDecks((previous) => previous.filter((item) => item.id !== deckId));
     setRenamingDeckId(null);
     setNotice('マイデッキから削除しました。');
   };
@@ -342,10 +346,9 @@ export default function Home() {
           <section className="rounded-2xl border border-[var(--line)] bg-white/75 p-3">
             <div className="mb-2 flex items-center justify-between px-1 pt-1"><div><p className="label">MY DECKS</p><h2 className="font-display mt-1 text-lg tracking-wide">マイデッキ</h2></div><Button size="icon-sm" variant="outline" className="border-[var(--line)]" onClick={createDeck} aria-label="新しいデッキ">＋</Button></div>
             {savedDecks.length === 0 ? <p className="rounded-xl bg-[var(--soft)] px-3 py-7 text-center text-xs leading-5 text-[var(--muted)]">保存済みのデッキはありません。<br />レシピタブの「マイデッキに保存」から追加できます。</p> : <div className="space-y-2">{savedDecks.map((deck) => {
-              const isActive = deck.id === activeDeckId;
               const isRenaming = renamingDeckId === deck.id;
-              return isRenaming ? <div key={deck.id} className="rounded-xl bg-[var(--mist)] p-2 ring-1 ring-[var(--line)]"><label htmlFor={'deck-name-' + deck.id} className="sr-only">デッキ名</label><Input id={'deck-name-' + deck.id} value={renamingDeckName} onChange={(event) => setRenamingDeckName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') saveDeckName(); }} className="h-9 border-[var(--line)] bg-white text-sm" autoFocus /><div className="mt-2 flex justify-end gap-1"><Button size="xs" variant="ghost" onClick={() => setRenamingDeckId(null)}>キャンセル</Button><Button size="xs" onClick={saveDeckName}>変更を保存</Button></div></div> : <div key={deck.id} className={'flex items-center gap-1 rounded-xl transition ' + (isActive ? 'bg-[var(--mist)] ring-1 ring-[var(--line)]' : 'hover:bg-[var(--soft)]')}>
-                <button type="button" onClick={() => { setActiveDeckId(deck.id); setActiveTab('recipe'); }} className="min-w-0 flex-1 px-3 py-2.5 text-left"><span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span>{isActive && <span className="shrink-0 text-[var(--green)]">✓</span>}</span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span></button>
+              return isRenaming ? <div key={deck.id} className="rounded-xl bg-[var(--mist)] p-2 ring-1 ring-[var(--line)]"><label htmlFor={'deck-name-' + deck.id} className="sr-only">デッキ名</label><Input id={'deck-name-' + deck.id} value={renamingDeckName} onChange={(event) => setRenamingDeckName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') saveDeckName(); }} className="h-9 border-[var(--line)] bg-white text-sm" autoFocus /><div className="mt-2 flex justify-end gap-1"><Button size="xs" variant="ghost" onClick={() => setRenamingDeckId(null)}>キャンセル</Button><Button size="xs" onClick={saveDeckName}>変更を保存</Button></div></div> : <div key={deck.id} className="flex items-center gap-1 rounded-xl transition hover:bg-[var(--soft)]">
+                <button type="button" onClick={() => { setActiveDeck(copyDeckAsDraft(deck)); setActiveTab('recipe'); setNotice('マイデッキを作業用レシピに読み込みました。変更は保存済みデッキへ反映されません。'); }} className="min-w-0 flex-1 px-3 py-2.5 text-left"><span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span></span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span></button>
                 <div className="flex shrink-0 gap-0.5 pr-1"><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => startRenamingDeck(deck)} aria-label={deck.name + 'の名前を変更'}>✎</Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--red)] hover:text-[var(--red)]" onClick={() => deleteSavedDeck(deck.id)} aria-label={deck.name + 'を削除'}>×</Button></div>
               </div>;
             })}</div>}
@@ -406,12 +409,12 @@ function DeckPile({ title, pile, deck, onAdjust, onMoveCard, onSelectCard }: {
     <div className="mb-2 flex items-center justify-between"><h2 className="font-display text-lg tracking-wide">{title}</h2><span className="text-xs text-[var(--muted)]">{countCards(deck[pile])}枚</span></div>
     {entries.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--soft)] px-4 py-6 text-center text-xs text-[var(--muted)]">カードタブから追加してください</div> : <ul className="flex flex-wrap gap-2" aria-label={title + 'のカード一覧'}>
       {entries.map(({ card, count }) => <li key={card.id} className="relative h-[112px] w-[80px] overflow-hidden rounded-md border border-black/15 bg-white shadow-sm">
-        <img src={card.imageUrl} alt={card.name} loading="lazy" className="h-full w-full object-cover object-top" />
-        <Button type="button" size="icon-xs" onClick={() => onAdjust(card.id, pile, -1)} aria-label={card.name + 'を1枚減らす'} className="absolute left-0 top-0 z-10 rounded-none rounded-br-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">−</Button>
-        <Button type="button" size="icon-xs" onClick={() => onAdjust(card.id, pile, 1)} aria-label={card.name + 'を1枚増やす'} className="absolute right-0 top-0 z-10 rounded-none rounded-bl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">＋</Button>
-        <Button type="button" size="icon-xs" variant="outline" onClick={() => onSelectCard(card.id)} aria-label={card.name + 'の詳細を開く'} className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 border-white/80 bg-white/90 text-base text-[var(--ink)] hover:bg-white">⌕</Button>
+        <button type="button" onClick={() => onSelectCard(card.id)} aria-label={card.name + 'の詳細を開く'} className="absolute inset-0 z-0"><img src={card.imageUrl} alt={card.name} loading="lazy" className="h-full w-full object-cover object-top" /></button>
+        <Button type="button" size="icon-xs" onClick={() => onAdjust(card.id, pile, -1)} aria-label={card.name + 'を1枚減らす'} className="absolute left-0 top-0 z-20 rounded-none rounded-br-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">−</Button>
+        <Button type="button" size="icon-xs" onClick={() => onAdjust(card.id, pile, 1)} aria-label={card.name + 'を1枚増やす'} className="absolute right-0 top-0 z-20 rounded-none rounded-bl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">＋</Button>
+        <button type="button" onClick={() => onSelectCard(card.id)} aria-label={card.name + 'の詳細を開く'} className="absolute left-1/2 top-1/2 z-20 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-md border border-white/80 bg-white/95 text-base text-[var(--ink)] shadow-sm hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]">⌕</button>
         <output aria-label={card.name + '：' + count + '枚'} className="absolute bottom-0 left-0 min-w-6 rounded-tr-md border-r border-t border-black/30 bg-white px-1.5 py-0.5 text-center font-display text-sm leading-none text-[var(--ink)]">{count}</output>
-        <Button type="button" size="icon-xs" onClick={() => onMoveCard(card.id, pile)} aria-label={card.name + 'を' + (pile === 'main' ? 'サイドデッキ' : 'メインデッキ') + 'へ1枚移動'} className="absolute bottom-0 right-0 z-10 rounded-none rounded-tl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">{pile === 'main' ? '↓' : '↑'}</Button>
+        <Button type="button" size="icon-xs" onClick={() => onMoveCard(card.id, pile)} aria-label={card.name + 'を' + (pile === 'main' ? 'サイドデッキ' : 'メインデッキ') + 'へ1枚移動'} className="absolute bottom-0 right-0 z-20 rounded-none rounded-tl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">{pile === 'main' ? '↓' : '↑'}</Button>
       </li>)}
     </ul>}
   </section>;
