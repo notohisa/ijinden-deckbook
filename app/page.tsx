@@ -90,6 +90,8 @@ export default function Home() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [catalogLimit, setCatalogLimit] = useState(80);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [renamingDeckId, setRenamingDeckId] = useState<string | null>(null);
+  const [renamingDeckName, setRenamingDeckName] = useState('');
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
   const [localDataReady, setLocalDataReady] = useState(false);
   const [notice, setNotice] = useState('カードを追加して、あなたの最初のデッキを作りましょう。');
@@ -203,6 +205,27 @@ export default function Home() {
     const created = newDeck(decks.length + 1);
     setDecks((previous) => [created, ...previous]); setActiveDeckId(created.id); setActiveTab('recipe');
     setNotice('空のデッキを作成しました。');
+  };
+  const startRenamingDeck = (deck: Deck) => {
+    setRenamingDeckId(deck.id);
+    setRenamingDeckName(deck.name);
+  };
+  const saveDeckName = () => {
+    if (!renamingDeckId) return;
+    setDecks((previous) => previous.map((deck) => deck.id === renamingDeckId
+      ? { ...deck, name: renamingDeckName.trim(), updatedAt: new Date().toISOString() } : deck));
+    setRenamingDeckId(null);
+    setNotice('デッキ名を変更しました。');
+  };
+  const deleteSavedDeck = (deckId: string) => {
+    const deck = decks.find((item) => item.id === deckId);
+    if (!deck || !window.confirm('「' + (deck.name || '名前のないデッキ') + '」を削除しますか？')) return;
+    const remaining = decks.filter((item) => item.id !== deckId);
+    const fallback = remaining[0] ?? newDeck(1);
+    setDecks(remaining.length > 0 ? remaining : [fallback]);
+    if (activeDeckId === deckId) setActiveDeckId(fallback.id);
+    setRenamingDeckId(null);
+    setNotice('マイデッキから削除しました。');
   };
   const clearActiveDeck = () => {
     updateActiveDeck((deck) => ({ ...deck, main: {}, side: {} }));
@@ -318,11 +341,13 @@ export default function Home() {
         {activeTab === 'myDecks' && <section className="mx-auto max-w-2xl space-y-4" role="tabpanel" aria-label="マイデッキ">
           <section className="rounded-2xl border border-[var(--line)] bg-white/75 p-3">
             <div className="mb-2 flex items-center justify-between px-1 pt-1"><div><p className="label">MY DECKS</p><h2 className="font-display mt-1 text-lg tracking-wide">マイデッキ</h2></div><Button size="icon-sm" variant="outline" className="border-[var(--line)]" onClick={createDeck} aria-label="新しいデッキ">＋</Button></div>
-            {savedDecks.length === 0 ? <p className="rounded-xl bg-[var(--soft)] px-3 py-7 text-center text-xs leading-5 text-[var(--muted)]">保存済みのデッキはありません。<br />レシピタブの「マイデッキに保存」から追加できます。</p> : <div className="space-y-1">{savedDecks.map((deck) => {
+            {savedDecks.length === 0 ? <p className="rounded-xl bg-[var(--soft)] px-3 py-7 text-center text-xs leading-5 text-[var(--muted)]">保存済みのデッキはありません。<br />レシピタブの「マイデッキに保存」から追加できます。</p> : <div className="space-y-2">{savedDecks.map((deck) => {
               const isActive = deck.id === activeDeckId;
-              return <button type="button" key={deck.id} onClick={() => { setActiveDeckId(deck.id); setActiveTab('recipe'); }} className={'w-full rounded-xl px-3 py-2.5 text-left transition ' + (isActive ? 'bg-[var(--mist)] ring-1 ring-[var(--line)]' : 'hover:bg-[var(--soft)]')}>
-                <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span>{isActive && <span className="shrink-0 text-[var(--green)]">✓</span>}</span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span>
-              </button>;
+              const isRenaming = renamingDeckId === deck.id;
+              return isRenaming ? <div key={deck.id} className="rounded-xl bg-[var(--mist)] p-2 ring-1 ring-[var(--line)]"><label htmlFor={'deck-name-' + deck.id} className="sr-only">デッキ名</label><Input id={'deck-name-' + deck.id} value={renamingDeckName} onChange={(event) => setRenamingDeckName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') saveDeckName(); }} className="h-9 border-[var(--line)] bg-white text-sm" autoFocus /><div className="mt-2 flex justify-end gap-1"><Button size="xs" variant="ghost" onClick={() => setRenamingDeckId(null)}>キャンセル</Button><Button size="xs" onClick={saveDeckName}>変更を保存</Button></div></div> : <div key={deck.id} className={'flex items-center gap-1 rounded-xl transition ' + (isActive ? 'bg-[var(--mist)] ring-1 ring-[var(--line)]' : 'hover:bg-[var(--soft)]')}>
+                <button type="button" onClick={() => { setActiveDeckId(deck.id); setActiveTab('recipe'); }} className="min-w-0 flex-1 px-3 py-2.5 text-left"><span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span>{isActive && <span className="shrink-0 text-[var(--green)]">✓</span>}</span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span></button>
+                <div className="flex shrink-0 gap-0.5 pr-1"><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => startRenamingDeck(deck)} aria-label={deck.name + 'の名前を変更'}>✎</Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--red)] hover:text-[var(--red)]" onClick={() => deleteSavedDeck(deck.id)} aria-label={deck.name + 'を削除'}>×</Button></div>
+              </div>;
             })}</div>}
           </section>
         </section>}
@@ -333,7 +358,7 @@ export default function Home() {
           <div className="mt-6 space-y-6">
             <section><h2 className="font-display text-lg">カード</h2><p className="mt-1 text-[var(--muted)]">名前・能力文・特性・カード番号から探せます。各カードのメイン／サイドの＋・−で、その場で枚数を調整できます。</p></section>
             <section><h2 className="font-display text-lg">レシピ</h2><p className="mt-1 text-[var(--muted)]">編集中のデッキの合計枚数、種類別枚数、メインデッキ、サイドデッキを確認できます。レシピのカード画像左下に枚数を表示します。メイン40枚で完成表示になります。</p></section>
-            <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">レシピタブで「マイデッキに保存」を押したデッキだけを表示します。保存したデッキの切り替えと、新しいデッキの作成を行えます。</p></section>
+            <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">レシピタブで「マイデッキに保存」を押したデッキだけを表示します。保存済みデッキの切り替え、名前変更、削除、新しいデッキの作成を行えます。</p></section>
             <section><h2 className="font-display text-lg">バックアップ</h2><p className="mt-1 text-[var(--muted)]">上部の「バックアップ」から、現在のマイデッキをJSONファイルとして控えられます。ブラウザのデータを消す前に作成してください。</p></section>
             <section className="rounded-xl bg-[var(--soft)] p-4 text-xs text-[var(--muted)]"><p className="font-medium text-[var(--ink)]">公式カードデータについて</p><p className="mt-1">全576種の名称・能力文と画像はイジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p><a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a></section>
           </div>
