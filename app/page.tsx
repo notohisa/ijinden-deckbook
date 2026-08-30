@@ -175,6 +175,15 @@ export default function Home() {
     if (next === 0) delete currentPile[cardId]; else currentPile[cardId] = next;
     return { ...deck, [pile]: currentPile };
   });
+  const moveCard = (cardId: string, fromPile: Pile) => updateActiveDeck((deck) => {
+    const toPile: Pile = fromPile === 'main' ? 'side' : 'main';
+    const source = { ...deck[fromPile] };
+    const destination = { ...deck[toPile] };
+    const next = (source[cardId] ?? 0) - 1;
+    if (next === 0) delete source[cardId]; else source[cardId] = next;
+    destination[cardId] = (destination[cardId] ?? 0) + 1;
+    return { ...deck, [fromPile]: source, [toPile]: destination };
+  });
   const saveActiveDeck = () => {
     if (mainCount + sideCount === 0) {
       setNotice('空のデッキはマイデッキに保存できません。カードを追加してから保存してください。');
@@ -285,7 +294,9 @@ export default function Home() {
 
         {activeTab === 'recipe' && <section className="mx-auto min-w-0 max-w-4xl rounded-2xl border border-[var(--line)] bg-white/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]" role="tabpanel" aria-label="レシピ">
           <div className="border-b border-[var(--line)] px-4 py-4 sm:px-5">
-            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="label">NOW EDITING</p><Input aria-label="デッキ名" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="mt-1 h-auto border-0 bg-transparent px-0 py-0 font-display text-2xl tracking-[0.06em] shadow-none focus-visible:ring-0" /></div><div className="flex shrink-0 flex-wrap justify-end gap-1"><Button size="sm" className="bg-[var(--green)] text-white hover:bg-[var(--green)]/85" onClick={saveActiveDeck}>マイデッキに保存</Button><Button size="sm" variant="outline" className="border-[var(--red)] text-[var(--red)] hover:bg-red-50 hover:text-[var(--red)]" onClick={clearActiveDeck}>レシピをクリア</Button></div></div>
+            <p className="label">NOW EDITING</p><h1 className="mt-1 font-display text-2xl tracking-wide">デッキレシピ</h1>
+            <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" className="bg-[var(--green)] text-white hover:bg-[var(--green)]/85" onClick={saveActiveDeck}>マイデッキに保存</Button><Button size="sm" variant="outline" className="border-[var(--red)] text-[var(--red)] hover:bg-red-50 hover:text-[var(--red)]" onClick={clearActiveDeck}>レシピをクリア</Button></div>
+            <div className="mt-3"><label htmlFor="deck-name" className="sr-only">デッキ名</label><Input id="deck-name" aria-label="デッキ名" placeholder="デッキ名を入力（任意）" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="h-11 w-full border-[var(--line)] bg-white px-3 text-base shadow-none" /></div>
             <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--line)] rounded-xl border border-[var(--line)] bg-[var(--soft)]">
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">MAIN</p><p className="font-display text-2xl">{mainCount}</p></div>
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">SIDE</p><p className="font-display text-2xl">{sideCount}</p></div>
@@ -298,8 +309,8 @@ export default function Home() {
           </div>
           <div className="p-4 sm:p-5">
             <div className="mb-4"><Button type="button" variant="outline" className="w-full border-[var(--line)] bg-[var(--paper)]" onClick={() => setActiveTab('cards')}>⌕ カードタブを開く</Button></div>
-            <DeckPile title="メインデッキ" pile="main" deck={activeDeck} />
-            <DeckPile title="サイドデッキ" pile="side" deck={activeDeck} />
+            <DeckPile title="メインデッキ" pile="main" deck={activeDeck} onAdjust={adjustCard} onMoveCard={moveCard} onSelectCard={selectCard} />
+            <DeckPile title="サイドデッキ" pile="side" deck={activeDeck} onAdjust={adjustCard} onMoveCard={moveCard} onSelectCard={selectCard} />
           </div>
           <div className="border-t border-[var(--line)] bg-[var(--soft)] px-4 py-3 sm:px-5"><p className="flex items-start gap-2 text-xs leading-5 text-[var(--muted)]"><span className="text-[var(--green)]">●</span>{notice}</p></div>
         </section>}
@@ -352,7 +363,12 @@ export default function Home() {
   );
 }
 
-function DeckPile({ title, pile, deck }: { title: string; pile: Pile; deck: Deck }) {
+function DeckPile({ title, pile, deck, onAdjust, onMoveCard, onSelectCard }: {
+  title: string; pile: Pile; deck: Deck;
+  onAdjust: (cardId: string, pile: Pile, difference: number) => void;
+  onMoveCard: (cardId: string, pile: Pile) => void;
+  onSelectCard: (cardId: string) => void;
+}) {
   const entries = Object.entries(deck[pile])
     .map(([cardId, count]) => ({ card: cards.find((card) => card.id === cardId), count }))
     .filter((entry): entry is { card: Card; count: number } => Boolean(entry.card))
@@ -366,7 +382,11 @@ function DeckPile({ title, pile, deck }: { title: string; pile: Pile; deck: Deck
     {entries.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--soft)] px-4 py-6 text-center text-xs text-[var(--muted)]">カードタブから追加してください</div> : <ul className="flex flex-wrap gap-2" aria-label={title + 'のカード一覧'}>
       {entries.map(({ card, count }) => <li key={card.id} className="relative h-[112px] w-[80px] overflow-hidden rounded-md border border-black/15 bg-white shadow-sm">
         <img src={card.imageUrl} alt={card.name} loading="lazy" className="h-full w-full object-cover object-top" />
+        <Button type="button" size="icon-xs" onClick={() => onAdjust(card.id, pile, -1)} aria-label={card.name + 'を1枚減らす'} className="absolute left-0 top-0 z-10 rounded-none rounded-br-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">−</Button>
+        <Button type="button" size="icon-xs" onClick={() => onAdjust(card.id, pile, 1)} aria-label={card.name + 'を1枚増やす'} className="absolute right-0 top-0 z-10 rounded-none rounded-bl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">＋</Button>
+        <Button type="button" size="icon-xs" variant="outline" onClick={() => onSelectCard(card.id)} aria-label={card.name + 'の詳細を開く'} className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 border-white/80 bg-white/90 text-base text-[var(--ink)] hover:bg-white">⌕</Button>
         <output aria-label={card.name + '：' + count + '枚'} className="absolute bottom-0 left-0 min-w-6 rounded-tr-md border-r border-t border-black/30 bg-white px-1.5 py-0.5 text-center font-display text-sm leading-none text-[var(--ink)]">{count}</output>
+        <Button type="button" size="icon-xs" onClick={() => onMoveCard(card.id, pile)} aria-label={card.name + 'を' + (pile === 'main' ? 'サイドデッキ' : 'メインデッキ') + 'へ1枚移動'} className="absolute bottom-0 right-0 z-10 rounded-none rounded-tl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]">{pile === 'main' ? '↓' : '↑'}</Button>
       </li>)}
     </ul>}
   </section>;
