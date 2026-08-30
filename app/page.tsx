@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
@@ -11,6 +11,7 @@ type DeckColor = 'default' | 'orange' | 'gray';
 type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string; isSaved?: boolean; color?: DeckColor };
 type ArchiveData = { version: 2; updatedAt: string; decks: Deck[]; draft: Deck };
 type LegacyArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
+type MyDeckExport = { version: 1; type: 'ijinden-deckbook-my-decks'; exportedAt: string; decks: Deck[] };
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'help';
 
 const cards: Card[] = ijindenCards;
@@ -66,6 +67,23 @@ function copyDeckAsDraft(deck: Deck): Deck {
   return { ...deck, id: crypto.randomUUID(), main: { ...deck.main }, side: { ...deck.side }, updatedAt: new Date().toISOString(), isSaved: false };
 }
 
+function parseImportedDeck(value: unknown): Deck | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const deck = value as Partial<Deck>;
+  const isPile = (pile: unknown): pile is Record<string, number> => Boolean(pile) && typeof pile === 'object' && !Array.isArray(pile) && Object.entries(pile).every(([cardId, count]) => cardsById.has(cardId) && Number.isInteger(count) && count > 0);
+  if (typeof deck.id !== 'string' || typeof deck.name !== 'string' || !isPile(deck.main) || !isPile(deck.side)) return null;
+  const color = deck.color === 'default' || deck.color === 'orange' || deck.color === 'gray' ? deck.color : undefined;
+  return {
+    id: deck.id,
+    name: deck.name,
+    main: { ...deck.main },
+    side: { ...deck.side },
+    updatedAt: typeof deck.updatedAt === 'string' ? deck.updatedAt : new Date().toISOString(),
+    isSaved: true,
+    ...(color ? { color } : {}),
+  };
+}
+
 function FilterPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return <Button type="button" size="xs" variant="outline" aria-pressed={active} onClick={onClick} className={active ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85 hover:text-[var(--paper)]' : 'border-[var(--line)] bg-white'}>{label}</Button>;
 }
@@ -112,6 +130,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
   const [localDataReady, setLocalDataReady] = useState(false);
   const [notice, setNotice] = useState('カードを追加して、あなたの最初のデッキを作りましょう。');
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const savedDecks = decks;
   const mainCount = countCards(activeDeck.main);
   const sideCount = countCards(activeDeck.side);
@@ -184,7 +203,7 @@ export default function Home() {
     try {
       window.localStorage.setItem(localStorageKey, JSON.stringify(archive));
     } catch {
-      setNotice('この端末に保存できませんでした。バックアップを作成してください。');
+      setNotice('この端末に保存できませんでした。マイデッキをエクスポートしてください。');
     }
   }, [archive, localDataReady]);
 
@@ -253,13 +272,47 @@ export default function Home() {
     updateActiveDeck((deck) => ({ ...deck, name: '', main: {}, side: {} }));
     setNotice('編集中のレシピとデッキ名をクリアしました。');
   };
-  const downloadBackup = () => {
-    const blob = new Blob([JSON.stringify(archive, null, 2)], { type: 'application/json' });
+  const exportMyDecks = () => {
+    const exported: MyDeckExport = {
+      version: 1,
+      type: 'ijinden-deckbook-my-decks',
+      exportedAt: new Date().toISOString(),
+      decks: decks.map((deck) => ({ ...deck, main: { ...deck.main }, side: { ...deck.side }, isSaved: true })),
+    };
+    const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url; link.download = 'deckbook-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    link.href = url; link.download = 'deckbook-my-decks-' + new Date().toISOString().slice(0, 10) + '.json';
     link.click(); URL.revokeObjectURL(url);
-    setNotice('復旧用バックアップをダウンロードしました。');
+    setNotice('マイデッキ' + String(decks.length) + '件をエクスポートしました。');
+  };
+  const importMyDecks = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const source = JSON.parse(await file.text()) as { decks?: unknown };
+      if (!Array.isArray(source.decks)) throw new Error('invalid export');
+      const importedDecks = source.decks.map(parseImportedDeck).filter((deck): deck is Deck => deck !== null);
+      if (importedDecks.length === 0) throw new Error('empty export');
+      const merged = new Map(decks.map((deck) => [deck.id, deck]));
+      let added = 0;
+      let updated = 0;
+      for (const deck of importedDecks) {
+        const current = merged.get(deck.id);
+        if (!current) {
+          merged.set(deck.id, deck);
+          added += 1;
+        } else if (Date.parse(deck.updatedAt) > Date.parse(current.updatedAt)) {
+          merged.set(deck.id, deck);
+          updated += 1;
+        }
+      }
+      setDecks(Array.from(merged.values()).sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)));
+      setNotice('マイデッキを読み込みました。新規 ' + String(added) + '件・更新 ' + String(updated) + '件です。');
+    } catch {
+      setNotice('読み込めませんでした。このアプリでエクスポートしたJSONファイルを選んでください。');
+    }
   };
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]">
@@ -270,8 +323,10 @@ export default function Home() {
             <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--ink)] text-lg text-[var(--paper)] shadow-[3px_3px_0_var(--red)]">◆</div>
             <div className="min-w-0"><p className="font-display text-lg leading-none tracking-[0.08em]">デッキ帳</p><p className="mt-1 text-[10px] tracking-[0.12em] text-[var(--muted)]">YOUR DECK, YOUR DEVICE</p></div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="border-[var(--line)] bg-white/70" onClick={downloadBackup}>↓ バックアップ</Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <input ref={importFileInputRef} type="file" accept="application/json,.json" className="sr-only" onChange={importMyDecks} />
+            <Button variant="outline" size="sm" className="border-[var(--line)] bg-white/70" onClick={exportMyDecks} aria-label="マイデッキをエクスポート"><span className="sm:hidden">↓ 出力</span><span className="hidden sm:inline">↓ エクスポート</span></Button>
+            <Button variant="outline" size="sm" className="border-[var(--line)] bg-white/70" onClick={() => importFileInputRef.current?.click()} aria-label="マイデッキをインポート"><span className="sm:hidden">↑ 取込</span><span className="hidden sm:inline">↑ インポート</span></Button>
           </div>
         </div>
         <nav className="mx-auto max-w-[1180px] overflow-x-auto px-4 sm:px-6" aria-label="メインメニュー">
@@ -380,7 +435,7 @@ export default function Home() {
             <section><h2 className="font-display text-lg">カード</h2><p className="mt-1 text-[var(--muted)]">名前・能力文・特性・カード番号から探せます。各カードのメイン／サイドの＋・−で、その場で枚数を調整できます。</p></section>
             <section><h2 className="font-display text-lg">レシピ</h2><p className="mt-1 text-[var(--muted)]">編集中のデッキの合計枚数、種類別枚数、メインデッキ、サイドデッキを確認できます。レシピのカード画像左下に枚数を表示します。メイン40枚で完成表示になります。</p></section>
             <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">レシピタブで「マイデッキに保存」を押したデッキだけを表示します。保存済みデッキの切り替え、名前変更、削除、新しいデッキの作成を行えます。</p></section>
-            <section><h2 className="font-display text-lg">バックアップ</h2><p className="mt-1 text-[var(--muted)]">上部の「バックアップ」から、現在のマイデッキをJSONファイルとして控えられます。ブラウザのデータを消す前に作成してください。</p></section>
+            <section><h2 className="font-display text-lg">エクスポート・インポート</h2><p className="mt-1 text-[var(--muted)]">この端末では、保存済みマイデッキと作業中レシピを自動保存します。上部の「エクスポート」で保存済みマイデッキだけをJSONファイルに出力し、別の端末で「インポート」すると追加・更新できます。作業中レシピは出力されません。</p></section>
             <section className="rounded-xl bg-[var(--soft)] p-4 text-xs text-[var(--muted)]"><p className="font-medium text-[var(--ink)]">公式カードデータについて</p><p className="mt-1">全576種の名称・能力文と画像はイジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p><a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a></section>
           </div>
         </section>}
