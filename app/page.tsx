@@ -195,11 +195,9 @@ export default function Home() {
     setDecks((previous) => [created, ...previous]); setActiveDeckId(created.id); setActiveTab('recipe');
     setNotice('空のデッキを作成しました。');
   };
-  const deleteDeck = () => {
-    if (decks.length === 1) return setNotice('最後の1つのデッキは削除できません。');
-    const remaining = decks.filter((deck) => deck.id !== activeDeckId);
-    setDecks(remaining); setActiveDeckId(remaining[0].id);
-    setNotice('デッキを削除しました。この端末に自動保存されます。');
+  const clearActiveDeck = () => {
+    updateActiveDeck((deck) => ({ ...deck, main: {}, side: {} }));
+    setNotice('編集中のレシピをクリアしました。');
   };
   const downloadBackup = () => {
     const blob = new Blob([JSON.stringify(archive, null, 2)], { type: 'application/json' });
@@ -287,7 +285,7 @@ export default function Home() {
 
         {activeTab === 'recipe' && <section className="mx-auto min-w-0 max-w-4xl rounded-2xl border border-[var(--line)] bg-white/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]" role="tabpanel" aria-label="レシピ">
           <div className="border-b border-[var(--line)] px-4 py-4 sm:px-5">
-            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="label">NOW EDITING</p><Input aria-label="デッキ名" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="mt-1 h-auto border-0 bg-transparent px-0 py-0 font-display text-2xl tracking-[0.06em] shadow-none focus-visible:ring-0" /></div><div className="flex shrink-0 items-center gap-1"><Button size="sm" className="bg-[var(--green)] text-white hover:bg-[var(--green)]/85" onClick={saveActiveDeck}>マイデッキに保存</Button><Button variant="ghost" size="icon" className="text-[var(--muted)] hover:text-[var(--red)]" onClick={deleteDeck} aria-label="このデッキを削除">⌫</Button></div></div>
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="label">NOW EDITING</p><Input aria-label="デッキ名" value={activeDeck.name} onChange={(event) => updateActiveDeck((deck) => ({ ...deck, name: event.target.value }))} className="mt-1 h-auto border-0 bg-transparent px-0 py-0 font-display text-2xl tracking-[0.06em] shadow-none focus-visible:ring-0" /></div><div className="flex shrink-0 flex-wrap justify-end gap-1"><Button size="sm" className="bg-[var(--green)] text-white hover:bg-[var(--green)]/85" onClick={saveActiveDeck}>マイデッキに保存</Button><Button size="sm" variant="outline" className="border-[var(--red)] text-[var(--red)] hover:bg-red-50 hover:text-[var(--red)]" onClick={clearActiveDeck}>レシピをクリア</Button></div></div>
             <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--line)] rounded-xl border border-[var(--line)] bg-[var(--soft)]">
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">MAIN</p><p className="font-display text-2xl">{mainCount}</p></div>
               <div className="px-3 py-2 text-center"><p className="text-[10px] tracking-wide text-[var(--muted)]">SIDE</p><p className="font-display text-2xl">{sideCount}</p></div>
