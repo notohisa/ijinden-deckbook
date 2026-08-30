@@ -7,7 +7,8 @@ import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
 
 type Pile = 'main' | 'side';
 type Card = IjindenCard;
-type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string; isSaved?: boolean };
+type DeckColor = 'default' | 'orange' | 'gray';
+type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string; isSaved?: boolean; color?: DeckColor };
 type ArchiveData = { version: 2; updatedAt: string; decks: Deck[]; draft: Deck };
 type LegacyArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'help';
@@ -26,6 +27,16 @@ const sortOptions: Array<{ value: SortBy; label: string }> = [
 const sortDirectionOptions: Array<{ value: SortDirection; label: string }> = [
   { value: 'asc', label: '昇順' }, { value: 'desc', label: '降順' },
 ];
+const deckColorOptions: Array<{ value: DeckColor; label: string; swatchClass: string }> = [
+  { value: 'default', label: '標準', swatchClass: 'bg-[var(--mist)]' },
+  { value: 'orange', label: 'オレンジ', swatchClass: 'bg-orange-400' },
+  { value: 'gray', label: 'グレー', swatchClass: 'bg-slate-400' },
+];
+const deckRowColorClasses: Record<DeckColor, string> = {
+  default: 'bg-white/50 hover:bg-[var(--soft)]',
+  orange: 'bg-orange-100 hover:bg-orange-200',
+  gray: 'bg-slate-200 hover:bg-slate-300',
+};
 const cardsById = new Map(cards.map((card) => [card.id, card]));
 const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
 const releaseOptions = Array.from(new Set(cards.map((card) => card.release)));
@@ -97,6 +108,7 @@ export default function Home() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [renamingDeckId, setRenamingDeckId] = useState<string | null>(null);
   const [renamingDeckName, setRenamingDeckName] = useState('');
+  const [colorPickerDeckId, setColorPickerDeckId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
   const [localDataReady, setLocalDataReady] = useState(false);
   const [notice, setNotice] = useState('カードを追加して、あなたの最初のデッキを作りましょう。');
@@ -224,6 +236,12 @@ export default function Home() {
     setRenamingDeckId(null);
     setNotice('デッキ名を変更しました。');
   };
+  const setDeckColor = (deckId: string, color: DeckColor) => {
+    setDecks((previous) => previous.map((deck) => deck.id === deckId
+      ? { ...deck, color, updatedAt: new Date().toISOString() } : deck));
+    setColorPickerDeckId(null);
+    setNotice('マイデッキの色を変更しました。');
+  };
   const deleteSavedDeck = (deckId: string) => {
     const deck = decks.find((item) => item.id === deckId);
     if (!deck || !window.confirm('「' + (deck.name || '名前のないデッキ') + '」を削除しますか？')) return;
@@ -347,10 +365,10 @@ export default function Home() {
             <div className="mb-2 flex items-center justify-between px-1 pt-1"><div><p className="label">MY DECKS</p><h2 className="font-display mt-1 text-lg tracking-wide">マイデッキ</h2></div><Button size="icon-sm" variant="outline" className="border-[var(--line)]" onClick={createDeck} aria-label="新しいデッキ">＋</Button></div>
             {savedDecks.length === 0 ? <p className="rounded-xl bg-[var(--soft)] px-3 py-7 text-center text-xs leading-5 text-[var(--muted)]">保存済みのデッキはありません。<br />レシピタブの「マイデッキに保存」から追加できます。</p> : <div className="space-y-2">{savedDecks.map((deck) => {
               const isRenaming = renamingDeckId === deck.id;
+              const isChoosingColor = colorPickerDeckId === deck.id;
+              const deckColor = deck.color ?? 'default';
               return isRenaming ? <div key={deck.id} className="rounded-xl bg-[var(--mist)] p-2 ring-1 ring-[var(--line)]"><label htmlFor={'deck-name-' + deck.id} className="sr-only">デッキ名</label><Input id={'deck-name-' + deck.id} value={renamingDeckName} onChange={(event) => setRenamingDeckName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') saveDeckName(); }} className="h-9 border-[var(--line)] bg-white text-sm" autoFocus /><div className="mt-2 flex justify-end gap-1"><Button size="xs" variant="ghost" onClick={() => setRenamingDeckId(null)}>キャンセル</Button><Button size="xs" onClick={saveDeckName}>変更を保存</Button></div></div> : <div key={deck.id} className="flex items-center gap-1 rounded-xl transition hover:bg-[var(--soft)]">
-                <button type="button" onClick={() => { setActiveDeck(copyDeckAsDraft(deck)); setActiveTab('recipe'); setNotice('マイデッキを作業用レシピに読み込みました。変更は保存済みデッキへ反映されません。'); }} className="min-w-0 flex-1 px-3 py-2.5 text-left"><span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span></span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span></button>
-                <div className="flex shrink-0 gap-0.5 pr-1"><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => startRenamingDeck(deck)} aria-label={deck.name + 'の名前を変更'}>✎</Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--red)] hover:text-[var(--red)]" onClick={() => deleteSavedDeck(deck.id)} aria-label={deck.name + 'を削除'}>×</Button></div>
-              </div>;
+                <div className={'flex w-full items-center gap-1 rounded-xl transition ' + deckRowColorClasses[deckColor]}><button type="button" onClick={() => { setActiveDeck(copyDeckAsDraft(deck)); setActiveTab('recipe'); setNotice('マイデッキを作業用レシピに読み込みました。変更は保存済みデッキへ反映されません。'); }} className="min-w-0 flex-1 px-3 py-2.5 text-left"><span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span></span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span></button><div className="flex shrink-0 gap-0.5 pr-1"><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => setColorPickerDeckId(isChoosingColor ? null : deck.id)} aria-label={deck.name + 'の色を変更'}><span aria-hidden="true" className={'size-3 rounded-full border border-black/20 ' + deckColorOptions.find((option) => option.value === deckColor)?.swatchClass} /></Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => startRenamingDeck(deck)} aria-label={deck.name + 'の名前を変更'}>✎</Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--red)] hover:text-[var(--red)]" onClick={() => deleteSavedDeck(deck.id)} aria-label={deck.name + 'を削除'}>×</Button></div></div>{isChoosingColor && <div className="mt-1 flex items-center gap-1 rounded-lg border border-[var(--line)] bg-white p-1.5"><span className="px-1 text-[11px] text-[var(--muted)]">色</span>{deckColorOptions.map((option) => <Button key={option.value} type="button" size="xs" variant={deckColor === option.value ? 'secondary' : 'ghost'} onClick={() => setDeckColor(deck.id, option.value)}><span aria-hidden="true" className={'size-2.5 rounded-full ' + option.swatchClass} />{option.label}</Button>)}</div>}</div>;
             })}</div>}
           </section>
         </section>}
