@@ -25,6 +25,9 @@ const cardsById = new Map(cards.map((card) => [card.id, card]));
 const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
 const releaseOptions = Array.from(new Set(cards.map((card) => card.release)));
 const rarityOptions = Array.from(new Set(cards.map((card) => card.rarity))).sort((a, b) => ['C', 'N', 'm', 'R', 'SR', 'PSR'].indexOf(a) - ['C', 'N', 'm', 'R', 'SR', 'PSR'].indexOf(b));
+const maxCardLevel = Math.max(17, ...cards.map((card) => card.level ?? 0));
+const maxCardPower = Math.max(10000, ...cards.map((card) => card.cardType === 'イジン' ? card.power ?? 0 : 0));
+const powerFilterCeiling = Math.ceil(maxCardPower / 500) * 500;
 const initialDeck: Deck = { id: 'new-deck', name: '新しいデッキ', main: {}, side: {}, updatedAt: new Date().toISOString() };
 const localStorageKey = 'ijinden-deckbook-v1';
 const countCards = (cardsInPile: Record<string, number>) => Object.values(cardsInPile).reduce((total, count) => total + count, 0);
@@ -76,9 +79,9 @@ export default function Home() {
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [levelMin, setLevelMin] = useState(0);
-  const [levelMax, setLevelMax] = useState(17);
+  const [levelMax, setLevelMax] = useState(maxCardLevel);
   const [powerMin, setPowerMin] = useState(0);
-  const [powerMax, setPowerMax] = useState(10000);
+  const [powerMax, setPowerMax] = useState(powerFilterCeiling);
   const [sortBy, setSortBy] = useState<SortBy>('official');
   const [catalogLimit, setCatalogLimit] = useState(80);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -120,7 +123,7 @@ export default function Home() {
   }, [levelMax, levelMin, powerMax, powerMin, query, selectedColors, selectedKeywords, selectedRarities, selectedReleases, selectedTypes, sortBy]);
   const visibleCards = useMemo(() => matchingCards.slice(0, catalogLimit), [catalogLimit, matchingCards]);
   const selectedCard = useMemo(() => cards.find((card) => card.id === selectedCardId) ?? null, [selectedCardId]);
-  const activeFilterCount = selectedTypes.length + selectedColors.length + selectedRarities.length + selectedReleases.length + selectedKeywords.length + Number(levelMin !== 0 || levelMax !== 17) + Number(powerMin !== 0 || powerMax !== 10000);
+  const activeFilterCount = selectedTypes.length + selectedColors.length + selectedRarities.length + selectedReleases.length + selectedKeywords.length + Number(levelMin !== 0 || levelMax !== maxCardLevel) + Number(powerMin !== 0 || powerMax !== powerFilterCeiling);
   const archive = useMemo<ArchiveData>(() => ({ version: 1, updatedAt: new Date().toISOString(), decks }), [decks]);
 
   useEffect(() => {
@@ -164,7 +167,7 @@ export default function Home() {
   };
   const resetCardSearch = () => {
     setQuery(''); setSelectedTypes([]); setSelectedColors([]); setSelectedRarities([]); setSelectedReleases([]); setSelectedKeywords([]);
-    setLevelMin(0); setLevelMax(17); setPowerMin(0); setPowerMax(10000); setSortBy('official'); setCatalogLimit(80);
+    setLevelMin(0); setLevelMax(maxCardLevel); setPowerMin(0); setPowerMax(powerFilterCeiling); setSortBy('official'); setCatalogLimit(80);
   };
   const createDeck = () => {
     const created = newDeck(decks.length + 1);
@@ -224,8 +227,8 @@ export default function Home() {
               <FilterGroup label="収録">{releaseOptions.map((release) => <FilterPill key={release} label={releaseLabel(release)} active={selectedReleases.includes(release)} onClick={() => { setSelectedReleases((values) => toggleFilterValue(values, release)); setCatalogLimit(80); }} />)}</FilterGroup>
               <FilterGroup label="特性・能力語・遺業">{abilityKeywordOptions.map((keyword) => <FilterPill key={keyword} label={keyword} active={selectedKeywords.includes(keyword)} onClick={() => { setSelectedKeywords((values) => toggleFilterValue(values, keyword)); setCatalogLimit(80); }} />)}</FilterGroup>
               <div className="grid gap-3 sm:grid-cols-2">
-                <RangeFilter label="レベル" min={levelMin} max={levelMax} ceiling={17} onMinChange={setLevelMin} onMaxChange={setLevelMax} />
-                <RangeFilter label="パワー（イジンのみ）" min={powerMin} max={powerMax} ceiling={10000} step={500} onMinChange={setPowerMin} onMaxChange={setPowerMax} />
+                <RangeFilter label="レベル" min={levelMin} max={levelMax} ceiling={maxCardLevel} onMinChange={setLevelMin} onMaxChange={setLevelMax} />
+                <RangeFilter label="パワー（イジンのみ）" min={powerMin} max={powerMax} ceiling={powerFilterCeiling} step={500} onMinChange={setPowerMin} onMaxChange={setPowerMax} />
               </div>
               <div><label htmlFor="card-sort" className="text-xs font-medium">並べ替え</label><select id="card-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortBy)} className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-white px-2 text-xs">{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
             </div>
