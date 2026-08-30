@@ -41,7 +41,7 @@ const deckRowColorClasses: Record<DeckColor, string> = {
 const cardsById = new Map(cards.map((card) => [card.id, card]));
 const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
 const releaseOptions = Array.from(new Set(cards.map((card) => card.release)));
-const rarityOptions = Array.from(new Set(cards.map((card) => card.rarity))).sort((a, b) => ['C', 'N', 'm', 'R', 'SR', 'PSR'].indexOf(a) - ['C', 'N', 'm', 'R', 'SR', 'PSR'].indexOf(b));
+const rarityOptions = Array.from(new Set(cards.map((card) => card.rarity))).sort((a, b) => ['N', 'm', 'R', 'SR', 'PSR'].indexOf(a) - ['N', 'm', 'R', 'SR', 'PSR'].indexOf(b));
 const maxCardLevel = Math.max(17, ...cards.map((card) => card.level ?? 0));
 const maxCardPower = Math.max(10000, ...cards.map((card) => card.cardType === 'イジン' ? card.power ?? 0 : 0));
 const powerFilterCeiling = Math.ceil(maxCardPower / 500) * 500;
