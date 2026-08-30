@@ -232,8 +232,8 @@ export default function Home() {
     setNotice('マイデッキから削除しました。');
   };
   const clearActiveDeck = () => {
-    updateActiveDeck((deck) => ({ ...deck, main: {}, side: {} }));
-    setNotice('編集中のレシピをクリアしました。');
+    updateActiveDeck((deck) => ({ ...deck, name: '', main: {}, side: {} }));
+    setNotice('編集中のレシピとデッキ名をクリアしました。');
   };
   const downloadBackup = () => {
     const blob = new Blob([JSON.stringify(archive, null, 2)], { type: 'application/json' });
