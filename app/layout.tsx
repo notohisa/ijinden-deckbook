@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'デッキ帳 | Google Drive デッキ管理',
-  description: 'あなたのデッキを、あなた自身のGoogle Driveに保存するデッキ作成アプリ。',
+  title: 'イジンデン デッキ帳',
+  description: 'イジンデンのデッキをこの端末に保存して作成できる、非公式のデッキ作成補助アプリ。',
   manifest: '/manifest.webmanifest',
   openGraph: {
-    title: 'デッキ帳',
-    description: 'Google Drive に、あなたのデッキを。',
+    title: 'イジンデン デッキ帳',
+    description: 'イジンデンのデッキをこの端末に保存して作成できる、非公式のデッキ作成補助アプリ。',
     images: ['/og.png'],
   },
 };
