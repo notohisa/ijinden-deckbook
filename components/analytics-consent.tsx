@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 const measurementId = 'G-PZYQCBGJCW';
 const consentStorageKey = 'ijinden-analytics-consent';
 const resetEventName = 'ijinden-analytics-consent-reset';
+const deniedConsent = { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' };
+const grantedConsent = { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' };
 
 declare global {
   interface Window {
@@ -14,10 +16,11 @@ declare global {
 }
 
 function enableAnalytics() {
-  if (document.querySelector('script[data-ijinden-analytics]')) return;
   window.dataLayer = window.dataLayer ?? [];
   window.gtag = (...args: unknown[]) => window.dataLayer?.push(args);
-  window.gtag('consent', 'default', { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+  const scriptAlreadyLoaded = Boolean(document.querySelector('script[data-ijinden-analytics]'));
+  window.gtag('consent', scriptAlreadyLoaded ? 'update' : 'default', grantedConsent);
+  if (scriptAlreadyLoaded) return;
   window.gtag('js', new Date());
   window.gtag('config', measurementId, { anonymize_ip: true, allow_google_signals: false, allow_ad_personalization_signals: false });
   const script = document.createElement('script');
@@ -25,6 +28,17 @@ function enableAnalytics() {
   script.src = 'https://www.googletagmanager.com/gtag/js?id=' + measurementId;
   script.dataset.ijindenAnalytics = 'true';
   document.head.appendChild(script);
+}
+
+function disableAnalytics() {
+  window.gtag?.('consent', 'update', deniedConsent);
+  const expires = 'expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  for (const entry of document.cookie.split(';')) {
+    const name = entry.trim().split('=')[0];
+    if (!name.startsWith('_ga') && name !== '_gid') continue;
+    document.cookie = name + '=; ' + expires;
+    document.cookie = name + '=; ' + expires + '; domain=.' + window.location.hostname;
+  }
 }
 
 export function resetAnalyticsConsent() {
@@ -44,6 +58,7 @@ export default function AnalyticsConsent() {
 
   useEffect(() => {
     if (consent === 'granted') enableAnalytics();
+    if (consent === 'denied') disableAnalytics();
   }, [consent]);
 
   const chooseConsent = (value: 'granted' | 'denied') => {
