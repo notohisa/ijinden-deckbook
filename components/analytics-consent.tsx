@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 
 const measurementId = 'G-PZYQCBGJCW';
 const consentStorageKey = 'ijinden-analytics-consent';
-const resetEventName = 'ijinden-analytics-consent-reset';
 const deniedConsent = { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' };
 const grantedConsent = { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' };
 
@@ -43,7 +42,10 @@ function disableAnalytics() {
 
 export function resetAnalyticsConsent() {
   window.localStorage.removeItem(consentStorageKey);
-  window.dispatchEvent(new Event(resetEventName));
+  // Re-mount the consent component after clearing the saved choice.  This is
+  // more reliable on iOS Safari than relying on a cross-component custom
+  // event, which can be missed while the Help tab is being switched.
+  window.location.reload();
 }
 
 export default function AnalyticsConsent() {
@@ -52,8 +54,6 @@ export default function AnalyticsConsent() {
   useEffect(() => {
     const readConsent = () => setConsent(window.localStorage.getItem(consentStorageKey));
     readConsent();
-    window.addEventListener(resetEventName, readConsent);
-    return () => window.removeEventListener(resetEventName, readConsent);
   }, []);
 
   useEffect(() => {
