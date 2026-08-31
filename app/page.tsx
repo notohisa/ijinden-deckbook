@@ -134,7 +134,9 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
   const [localDataReady, setLocalDataReady] = useState(false);
   const [notice, setNotice] = useState('カードを追加して、あなたの最初のデッキを作りましょう。');
+  const [toast, setToast] = useState<string | null>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const noticeTimerRef = useRef<number | null>(null);
   const savedDecks = decks;
   const mainCount = countCards(activeDeck.main);
   const sideCount = countCards(activeDeck.side);
@@ -179,6 +181,19 @@ export default function Home() {
   const selectedCard = useMemo(() => cards.find((card) => card.id === selectedCardId) ?? null, [selectedCardId]);
   const activeFilterCount = selectedTypes.length + selectedColors.length + selectedRarities.length + selectedReleases.length + selectedKeywords.length + Number(levelMin !== 0 || levelMax !== maxCardLevel) + Number(powerMin !== 0 || powerMax !== powerFilterCeiling);
   const archive = useMemo<ArchiveData>(() => ({ version: 2, updatedAt: new Date().toISOString(), decks, draft: activeDeck }), [activeDeck, decks]);
+  const showNotice = (message: string) => {
+    setNotice(message);
+    setToast(message);
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      noticeTimerRef.current = null;
+    }, 4500);
+  };
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+  }, []);
 
   useEffect(() => {
     try {
@@ -188,15 +203,15 @@ export default function Home() {
       if (savedArchive.version === 2) {
         setDecks(savedArchive.decks);
         setActiveDeck({ ...savedArchive.draft, main: { ...savedArchive.draft.main }, side: { ...savedArchive.draft.side }, isSaved: false });
-        setNotice('保存済みデッキと作業中のレシピを読み込みました。');
+        showNotice('保存済みデッキと作業中のレシピを読み込みました。');
       } else if (savedArchive.version === 1 && savedArchive.decks.length > 0) {
         const legacyDraft = savedArchive.decks.find((deck) => !deck.isSaved);
         setDecks(savedArchive.decks.filter((deck) => deck.isSaved));
         if (legacyDraft) setActiveDeck(copyDeckAsDraft(legacyDraft));
-        setNotice('保存済みデッキを読み込みました。');
+        showNotice('保存済みデッキを読み込みました。');
       }
     } catch {
-      setNotice('この端末の保存データを読み込めませんでした。');
+      showNotice('この端末の保存データを読み込めませんでした。');
     } finally {
       setLocalDataReady(true);
     }
@@ -207,7 +222,7 @@ export default function Home() {
     try {
       window.localStorage.setItem(localStorageKey, JSON.stringify(archive));
     } catch {
-      setNotice('この端末に保存できませんでした。マイデッキをエクスポートしてください。');
+      showNotice('この端末に保存できませんでした。マイデッキをエクスポートしてください。');
     }
   }, [archive, localDataReady]);
 
@@ -229,17 +244,17 @@ export default function Home() {
   });
   const saveActiveDeck = () => {
     if (mainCount + sideCount === 0) {
-      setNotice('空のデッキはマイデッキに保存できません。カードを追加してから保存してください。');
+      showNotice('空のデッキはマイデッキに保存できません。カードを追加してから保存してください。');
       return;
     }
     const name = normalizedDeckName(activeDeck.name);
     if (decks.some((deck) => normalizedDeckName(deck.name) === name)) {
-      setNotice('同名のデッキはマイデッキに保存できません。デッキ名を変更してください。');
+      showNotice('同名のデッキはマイデッキに保存できません。デッキ名を変更してください。');
       return;
     }
     const savedDeck = { ...activeDeck, id: crypto.randomUUID(), name, main: { ...activeDeck.main }, side: { ...activeDeck.side }, updatedAt: new Date().toISOString(), isSaved: true };
     setDecks((previous) => [savedDeck, ...previous]);
-    setNotice('「' + (activeDeck.name || '名前のないデッキ') + '」をマイデッキに保存しました。');
+    showNotice('「' + (activeDeck.name || '名前のないデッキ') + '」をマイデッキに保存しました。');
   };
   const selectCard = (cardId: string) => {
     setSelectedCardId(cardId);
@@ -251,7 +266,7 @@ export default function Home() {
   const createDeck = () => {
     const created = newDeck(decks.length + 1);
     setActiveDeck(created); setActiveTab('recipe');
-    setNotice('空のデッキを作成しました。');
+    showNotice('空のデッキを作成しました。');
   };
   const startRenamingDeck = (deck: Deck) => {
     setRenamingDeckId(deck.id);
@@ -261,30 +276,30 @@ export default function Home() {
     if (!renamingDeckId) return;
     const name = normalizedDeckName(renamingDeckName);
     if (decks.some((deck) => deck.id !== renamingDeckId && normalizedDeckName(deck.name) === name)) {
-      setNotice('同名のデッキには変更できません。別のデッキ名を入力してください。');
+      showNotice('同名のデッキには変更できません。別のデッキ名を入力してください。');
       return;
     }
     setDecks((previous) => previous.map((deck) => deck.id === renamingDeckId
       ? { ...deck, name, updatedAt: new Date().toISOString() } : deck));
     setRenamingDeckId(null);
-    setNotice('デッキ名を変更しました。');
+    showNotice('デッキ名を変更しました。');
   };
   const setDeckColor = (deckId: string, color: DeckColor) => {
     setDecks((previous) => previous.map((deck) => deck.id === deckId
       ? { ...deck, color, updatedAt: new Date().toISOString() } : deck));
     setColorPickerDeckId(null);
-    setNotice('マイデッキの色を変更しました。');
+    showNotice('マイデッキの色を変更しました。');
   };
   const deleteSavedDeck = (deckId: string) => {
     const deck = decks.find((item) => item.id === deckId);
     if (!deck || !window.confirm('「' + (deck.name || '名前のないデッキ') + '」を削除しますか？')) return;
     setDecks((previous) => previous.filter((item) => item.id !== deckId));
     setRenamingDeckId(null);
-    setNotice('マイデッキから削除しました。');
+    showNotice('マイデッキから削除しました。');
   };
   const clearActiveDeck = () => {
     updateActiveDeck((deck) => ({ ...deck, name: '', main: {}, side: {} }));
-    setNotice('編集中のレシピとデッキ名をクリアしました。');
+    showNotice('編集中のレシピとデッキ名をクリアしました。');
   };
   const exportMyDecks = () => {
     const exported: MyDeckExport = {
@@ -298,7 +313,7 @@ export default function Home() {
     const link = document.createElement('a');
     link.href = url; link.download = 'deckbook-my-decks-' + new Date().toISOString().slice(0, 10) + '.json';
     link.click(); URL.revokeObjectURL(url);
-    setNotice('マイデッキ' + String(decks.length) + '件をエクスポートしました。');
+    showNotice('マイデッキ' + String(decks.length) + '件をエクスポートしました。');
   };
   const importMyDecks = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -334,9 +349,9 @@ export default function Home() {
         updated += 1;
       }
       setDecks(Array.from(merged.values()).sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)));
-      setNotice('マイデッキを読み込みました。新規 ' + String(added) + '件・更新 ' + String(updated) + '件です。');
+      showNotice('マイデッキを読み込みました。新規 ' + String(added) + '件・更新 ' + String(updated) + '件です。');
     } catch {
-      setNotice('読み込めませんでした。このアプリでエクスポートしたJSONファイルを選んでください。');
+      showNotice('読み込めませんでした。このアプリでエクスポートしたJSONファイルを選んでください。');
     }
   };
   return (
@@ -448,7 +463,7 @@ export default function Home() {
               const isChoosingColor = colorPickerDeckId === deck.id;
               const deckColor = deck.color ?? 'default';
               return isRenaming ? <div key={deck.id} className="rounded-xl bg-[var(--mist)] p-2 ring-1 ring-[var(--line)]"><label htmlFor={'deck-name-' + deck.id} className="sr-only">デッキ名</label><Input id={'deck-name-' + deck.id} value={renamingDeckName} onChange={(event) => setRenamingDeckName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') saveDeckName(); }} className="h-9 border-[var(--line)] bg-white text-sm" autoFocus /><div className="mt-2 flex justify-end gap-1"><Button size="xs" variant="ghost" onClick={() => setRenamingDeckId(null)}>キャンセル</Button><Button size="xs" onClick={saveDeckName}>変更を保存</Button></div></div> : <div key={deck.id} className="space-y-1">
-                <div className={'flex w-full items-center gap-1 rounded-xl transition ' + deckRowColorClasses[deckColor]}><button type="button" onClick={() => { setActiveDeck(copyDeckAsDraft(deck)); setActiveTab('recipe'); setNotice('マイデッキを作業用レシピに読み込みました。変更は保存済みデッキへ反映されません。'); }} className="min-w-0 flex-1 px-3 py-2.5 text-left"><span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span></span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span></button><div className="flex shrink-0 gap-0.5 pr-1"><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => setColorPickerDeckId(isChoosingColor ? null : deck.id)} aria-label={deck.name + 'の色を変更'}><span aria-hidden="true" className={'size-3 rounded-full border border-black/20 ' + deckColorOptions.find((option) => option.value === deckColor)?.swatchClass} /></Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => startRenamingDeck(deck)} aria-label={deck.name + 'の名前を変更'}>✎</Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--red)] hover:text-[var(--red)]" onClick={() => deleteSavedDeck(deck.id)} aria-label={deck.name + 'を削除'}>×</Button></div></div>{isChoosingColor && <div className="grid grid-cols-3 gap-1 rounded-lg border border-[var(--line)] bg-white p-1.5"><p className="col-span-3 px-1 text-[11px] text-[var(--muted)]">デッキの色</p>{deckColorOptions.map((option) => <Button key={option.value} type="button" size="xs" className="w-full" variant={deckColor === option.value ? 'secondary' : 'ghost'} onClick={() => setDeckColor(deck.id, option.value)}><span aria-hidden="true" className={'size-2.5 rounded-full ' + option.swatchClass} />{option.label}</Button>)}</div>}</div>;
+                <div className={'flex w-full items-center gap-1 rounded-xl transition ' + deckRowColorClasses[deckColor]}><button type="button" onClick={() => { setActiveDeck(copyDeckAsDraft(deck)); setActiveTab('recipe'); showNotice('マイデッキを作業用レシピに読み込みました。変更は保存済みデッキへ反映されません。'); }} className="min-w-0 flex-1 px-3 py-2.5 text-left"><span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{deck.name || '名前のないデッキ'}</span></span><span className="mt-1 block text-[11px] text-[var(--muted)]">メイン {countCards(deck.main)}枚 · サイド {countCards(deck.side)}枚</span></button><div className="flex shrink-0 gap-0.5 pr-1"><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => setColorPickerDeckId(isChoosingColor ? null : deck.id)} aria-label={deck.name + 'の色を変更'}><span aria-hidden="true" className={'size-3 rounded-full border border-black/20 ' + deckColorOptions.find((option) => option.value === deckColor)?.swatchClass} /></Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--muted)]" onClick={() => startRenamingDeck(deck)} aria-label={deck.name + 'の名前を変更'}>✎</Button><Button type="button" size="icon-xs" variant="ghost" className="text-[var(--red)] hover:text-[var(--red)]" onClick={() => deleteSavedDeck(deck.id)} aria-label={deck.name + 'を削除'}>×</Button></div></div>{isChoosingColor && <div className="grid grid-cols-3 gap-1 rounded-lg border border-[var(--line)] bg-white p-1.5"><p className="col-span-3 px-1 text-[11px] text-[var(--muted)]">デッキの色</p>{deckColorOptions.map((option) => <Button key={option.value} type="button" size="xs" className="w-full" variant={deckColor === option.value ? 'secondary' : 'ghost'} onClick={() => setDeckColor(deck.id, option.value)}><span aria-hidden="true" className={'size-2.5 rounded-full ' + option.swatchClass} />{option.label}</Button>)}</div>}</div>;
             })}</div>}
           </section>
         </section>}
@@ -465,6 +480,11 @@ export default function Home() {
           </div>
         </section>}
       </div>
+      {toast && <div className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[60] mx-auto flex max-w-lg items-start gap-2 rounded-xl border border-[var(--green)] bg-white px-3 py-3 text-sm leading-5 text-[var(--ink)] shadow-lg" role="status" aria-live="polite">
+        <span className="mt-0.5 text-[var(--green)]" aria-hidden="true">●</span>
+        <p className="min-w-0 flex-1">{toast}</p>
+        <button type="button" className="-mr-1 -mt-1 grid size-7 shrink-0 place-items-center rounded-md text-lg text-[var(--muted)] hover:bg-[var(--soft)]" onClick={() => setToast(null)} aria-label="通知を閉じる">×</button>
+      </div>}
       {selectedCard && <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-0 sm:place-items-center sm:p-5" role="dialog" aria-modal="true" aria-label={selectedCard.name + 'を追加'}>
         <button type="button" className="absolute inset-0 cursor-default" aria-label="カード詳細を閉じる" onClick={() => setSelectedCardId(null)} />
         <section className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-[#f8f5ee] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
