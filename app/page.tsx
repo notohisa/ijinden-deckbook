@@ -89,7 +89,7 @@ function normalizedDeckName(name: string) {
 }
 
 function FilterPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <Button type="button" size="xs" variant="outline" aria-pressed={active} onClick={onClick} className={active ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink)]/85 hover:text-[var(--paper)]' : 'border-[var(--line)] bg-white'}>{label}</Button>;
+  return <Button type="button" size="xs" variant="outline" aria-pressed={active} onClick={onClick} className={active ? 'border-[var(--ink)] bg-[var(--ink)] !text-white hover:bg-[var(--ink)]/85 hover:!text-white' : 'border-[var(--line)] bg-white text-[var(--ink)]'}>{label}</Button>;
 }
 
 function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
@@ -115,6 +115,7 @@ export default function Home() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [activeDeck, setActiveDeck] = useState<Deck>(initialDeck);
   const [query, setQuery] = useState('');
+  const [queryDraft, setQueryDraft] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<CardType[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
@@ -137,6 +138,7 @@ export default function Home() {
   const [toast, setToast] = useState<string | null>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
+  const isComposingQueryRef = useRef(false);
   const savedDecks = decks;
   const mainCount = countCards(activeDeck.main);
   const sideCount = countCards(activeDeck.side);
@@ -189,6 +191,10 @@ export default function Home() {
       setToast(null);
       noticeTimerRef.current = null;
     }, 4500);
+  };
+  const applyQuery = (value: string) => {
+    setQuery(value);
+    setCatalogLimit(80);
   };
 
   useEffect(() => () => {
@@ -260,7 +266,7 @@ export default function Home() {
     setSelectedCardId(cardId);
   };
   const resetCardSearch = () => {
-    setQuery(''); setSelectedTypes([]); setSelectedColors([]); setSelectedRarities([]); setSelectedReleases([]); setSelectedKeywords([]);
+    setQuery(''); setQueryDraft(''); setSelectedTypes([]); setSelectedColors([]); setSelectedRarities([]); setSelectedReleases([]); setSelectedKeywords([]);
     setLevelMin(0); setLevelMax(maxCardLevel); setPowerMin(0); setPowerMax(powerFilterCeiling); setSortBy('official'); setSortDirection('asc'); setCatalogLimit(80);
   };
   const createDeck = () => {
@@ -384,7 +390,7 @@ export default function Home() {
             <div><p className="label">CARD CATALOG</p><h1 className="font-display mt-1 text-xl tracking-wide">カードを探す</h1><p className="mt-1 text-[11px] text-[var(--muted)]">編集中：{activeDeck.name || '名前のないデッキ'} · メイン {mainCount}枚 / サイド {sideCount}枚</p></div>
             <span className="rounded-full bg-[var(--mist)] px-2 py-1 text-[11px] text-[var(--muted)]">{matchingCards.length}件</span>
           </div>
-          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><Input value={query} onChange={(event) => { setQuery(event.target.value); setCatalogLimit(80); }} placeholder="名前・能力文・特性・カード番号で検索" className="h-10 border-[var(--line)] bg-white pl-9" /></div>
+          <div className="relative mb-3"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">⌕</span><input type="search" inputMode="search" value={queryDraft} onCompositionStart={() => { isComposingQueryRef.current = true; }} onCompositionEnd={(event) => { isComposingQueryRef.current = false; const value = event.currentTarget.value; setQueryDraft(value); applyQuery(value); }} onChange={(event) => { const value = event.target.value; setQueryDraft(value); if (!isComposingQueryRef.current) applyQuery(value); }} placeholder="名前・能力文・特性・カード番号で検索" className="h-10 w-full rounded-lg border border-[var(--line)] bg-white py-1 pr-2 pl-9 text-base outline-none placeholder:text-[var(--muted)] focus-visible:border-[var(--ring)] focus-visible:ring-3 focus-visible:ring-[var(--ring)]/50 md:text-sm" /></div>
           <details className="mb-3 rounded-xl border border-[var(--line)] bg-white/80">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium marker:content-none"><span>⌘ 条件で絞り込む</span><span className={activeFilterCount > 0 ? 'rounded-full bg-[var(--red)] px-2 py-0.5 text-[10px] text-white' : 'rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--muted)]'}>{activeFilterCount > 0 ? activeFilterCount + '件選択中' : 'すべて'}</span></summary>
             <div className="space-y-4 border-t border-[var(--line)] px-3 pb-3 pt-3">
@@ -480,7 +486,7 @@ export default function Home() {
           </div>
         </section>}
       </div>
-      {toast && <div className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[60] mx-auto flex max-w-lg items-start gap-2 rounded-xl border border-[var(--green)] bg-white px-3 py-3 text-sm leading-5 text-[var(--ink)] shadow-lg" role="status" aria-live="polite">
+      {toast && <div className="fixed inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-[60] mx-auto flex max-w-lg items-start gap-2 rounded-xl border border-[var(--green)] bg-white px-3 py-3 text-sm leading-5 text-[var(--ink)] shadow-lg" role="status" aria-live="polite">
         <span className="mt-0.5 text-[var(--green)]" aria-hidden="true">●</span>
         <p className="min-w-0 flex-1">{toast}</p>
         <button type="button" className="-mr-1 -mt-1 grid size-7 shrink-0 place-items-center rounded-md text-lg text-[var(--muted)] hover:bg-[var(--soft)]" onClick={() => setToast(null)} aria-label="通知を閉じる">×</button>
