@@ -3,6 +3,7 @@
 import { type ChangeEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { resetAnalyticsConsent } from '@/components/analytics-consent';
 import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
 
 type Pile = 'main' | 'side';
@@ -482,6 +483,7 @@ export default function Home() {
             <section><h2 className="font-display text-lg">レシピ</h2><p className="mt-1 text-[var(--muted)]">編集中のデッキの合計枚数、種類別枚数、メインデッキ、サイドデッキを確認できます。レシピのカード画像左下に枚数を表示します。メイン40枚で完成表示になります。</p></section>
             <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">レシピタブで「マイデッキに保存」を押したデッキだけを表示します。保存済みデッキの切り替え、名前変更、削除、新しいデッキの作成を行えます。</p></section>
             <section><h2 className="font-display text-lg">エクスポート・インポート</h2><p className="mt-1 text-[var(--muted)]">この端末では、保存済みマイデッキと作業中レシピを自動保存します。上部の「エクスポート」で保存済みマイデッキだけをJSONファイルに出力し、別の端末で「インポート」すると追加・更新できます。同じ名前の保存済みデッキがある場合は、インポートした内容で上書きします。作業中レシピは出力されません。</p></section>
+            <section><h2 className="font-display text-lg">アクセス解析</h2><p className="mt-1 text-[var(--muted)]">利用状況を把握するため、許可した場合のみGoogle Analyticsでページ閲覧を計測します。マイデッキの内容、デッキ名、カード選択や検索語は送信しません。Googleの広告向け機能と拡張計測は使用しません。</p><div className="mt-2 flex flex-wrap items-center gap-3"><button type="button" className="text-xs font-medium text-[var(--red)] underline underline-offset-2" onClick={resetAnalyticsConsent}>アクセス解析の選択をやり直す</button><a className="text-xs text-[var(--red)] underline underline-offset-2" href="https://policies.google.com/technologies/partner-sites?hl=ja" target="_blank" rel="noreferrer">Googleによる情報利用について ↗</a></div></section>
             <section className="rounded-xl bg-[var(--soft)] p-4 text-xs text-[var(--muted)]"><p className="font-medium text-[var(--ink)]">公式カードデータについて</p><p className="mt-1">全576種の名称・能力文と画像はイジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p><a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a></section>
           </div>
         </section>}
