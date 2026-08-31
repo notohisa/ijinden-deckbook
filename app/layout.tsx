@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import AnalyticsConsent from '@/components/analytics-consent';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -14,5 +13,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ja"><body>{children}<AnalyticsConsent /></body></html>;
+  return <html lang="ja"><body>{children}<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon={'{"token":"d72e2fc6487c4978831a721f916e786f"}'} /></body></html>;
 }
