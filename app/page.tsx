@@ -20,7 +20,11 @@ type CardType = (typeof cardTypes)[number];
 type SortBy = 'official' | 'level' | 'power' | 'type' | 'color' | 'name';
 type SortDirection = 'asc' | 'desc';
 const colorOptions = ['赤', '青', '緑', '黄', '紫', '無'] as const;
-const abilityKeywordOptions = ['剣術', '美術', '音楽', '思想', '医術', '志願', '航海', '執筆', '決起', '徴募', '魔導', '勝鬨', '躍進', '魔力化', '冥府発動', '復元', '反魂', '木霊', '喪神'];
+const abilityKeywordOptions = [
+  '剣術', '美術', '音楽', '思想', '医術', '志願',
+  '航海', '執筆', '決起', '徴募', '魔導', '勝鬨', '躍進', '魔力化', '冥府発動', '復元', '反魂', '木霊', '喪神',
+  '即応', 'ダブルプレッシャー', 'トリプルプレッシャー', 'ドレイン', 'ウォッチャー', 'スタンド', 'モータル', '消耗', '装備', '冥装',
+];
 const sortOptions: Array<{ value: SortBy; label: string }> = [
   { value: 'official', label: '公式順' }, { value: 'level', label: 'レベル順' }, { value: 'power', label: 'パワー順' },
   { value: 'type', label: '種類順' }, { value: 'color', label: '色順' }, { value: 'name', label: '名前順' },
@@ -399,7 +403,13 @@ export default function Home() {
               <FilterGroup label="色">{colorOptions.map((color) => <FilterPill key={color} label={color === '無' ? '無色' : color} active={selectedColors.includes(color)} onClick={() => { setSelectedColors((values) => toggleFilterValue(values, color)); setCatalogLimit(80); }} />)}</FilterGroup>
               <FilterGroup label="レアリティ">{rarityOptions.map((rarity) => <FilterPill key={rarity} label={rarity} active={selectedRarities.includes(rarity)} onClick={() => { setSelectedRarities((values) => toggleFilterValue(values, rarity)); setCatalogLimit(80); }} />)}</FilterGroup>
               <FilterGroup label="収録">{releaseOptions.map((release) => <FilterPill key={release} label={releaseLabel(release)} active={selectedReleases.includes(release)} onClick={() => { setSelectedReleases((values) => toggleFilterValue(values, release)); setCatalogLimit(80); }} />)}</FilterGroup>
-              <FilterGroup label="特性・能力語・遺業">{abilityKeywordOptions.map((keyword) => <FilterPill key={keyword} label={keyword} active={selectedKeywords.includes(keyword)} onClick={() => { setSelectedKeywords((values) => toggleFilterValue(values, keyword)); setCatalogLimit(80); }} />)}</FilterGroup>
+              <details open className="rounded-lg border border-[var(--line)] bg-[var(--soft)]/45">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2 text-xs font-medium marker:content-none">
+                  <span>特性・能力語・遺業</span>
+                  <span className={selectedKeywords.length > 0 ? 'rounded-full bg-[var(--red)] px-1.5 py-0.5 text-[10px] text-white' : 'text-[var(--muted)]'}>{selectedKeywords.length > 0 ? selectedKeywords.length + '件選択中' : '開く／しまう'}</span>
+                </summary>
+                <div className="border-t border-[var(--line)] px-2.5 py-2.5"><div className="flex flex-wrap gap-1.5">{abilityKeywordOptions.map((keyword) => <FilterPill key={keyword} label={keyword} active={selectedKeywords.includes(keyword)} onClick={() => { setSelectedKeywords((values) => toggleFilterValue(values, keyword)); setCatalogLimit(80); }} />)}</div></div>
+              </details>
               <div className="grid gap-3 sm:grid-cols-2">
                 <RangeFilter label="レベル" min={levelMin} max={levelMax} ceiling={maxCardLevel} onMinChange={setLevelMin} onMaxChange={setLevelMax} />
                 <RangeFilter label="パワー（イジンのみ）" min={powerMin} max={powerMax} ceiling={powerFilterCeiling} step={500} onMinChange={setPowerMin} onMaxChange={setPowerMax} />
