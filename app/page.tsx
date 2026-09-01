@@ -4,9 +4,10 @@ import { type ChangeEvent, type ReactNode, useEffect, useMemo, useRef, useState 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
+import { customCards, type CustomIjindenCard } from '@/app/custom-cards';
 
 type Pile = 'main' | 'side';
-type Card = IjindenCard;
+type Card = IjindenCard | CustomIjindenCard;
 type DeckColor = 'default' | 'orange' | 'gray';
 type Deck = { id: string; name: string; main: Record<string, number>; side: Record<string, number>; updatedAt: string; isSaved?: boolean; color?: DeckColor };
 type ArchiveData = { version: 2; updatedAt: string; decks: Deck[]; draft: Deck };
@@ -14,7 +15,7 @@ type LegacyArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
 type MyDeckExport = { version: 1; type: 'ijinden-deckbook-my-decks'; exportedAt: string; decks: Deck[] };
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'help';
 
-const cards: Card[] = ijindenCards;
+const cards: Card[] = [...ijindenCards, ...customCards];
 const cardTypes = ['イジン', 'ハイケイ', 'マホウ', 'マリョク'] as const;
 type CardType = (typeof cardTypes)[number];
 type SortBy = 'official' | 'level' | 'power' | 'type' | 'color' | 'name';
@@ -517,6 +518,7 @@ export default function Home() {
               <div className="mt-3 flex flex-wrap gap-1.5 text-xs"><span className="rounded-full bg-[var(--ink)] px-2 py-1 text-white">{selectedCard.cardType}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">{selectedCard.rarity}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">{selectedCard.color}</span><span className="rounded-full bg-[var(--mist)] px-2 py-1">Lv.{selectedCard.level ?? '-'}</span>{selectedCard.power !== null && <span className="rounded-full bg-[var(--mist)] px-2 py-1">パワー {selectedCard.power}</span>}</div>
               {selectedCard.trait && <p className="mt-3 text-xs text-[var(--muted)]">{selectedCard.trait}</p>}
               <p className="mt-3 whitespace-pre-line text-xs leading-5 text-[var(--ink)] sm:text-sm">{selectedCard.description || '公式カード情報'}</p>
+              {'illustrator' in selectedCard && selectedCard.illustrator && <p className="mt-3 text-xs text-[var(--muted)]">イラストレーター：{selectedCard.illustrator}</p>}
             </div>
           </div>
         </section>
