@@ -96,8 +96,14 @@ function FilterPill({ active, label, onClick }: { active: boolean; label: string
   return <Button type="button" size="xs" variant="outline" aria-pressed={active} onClick={onClick} className={active ? 'border-[var(--ink)] bg-[var(--ink)] !text-white hover:bg-[var(--ink)]/85 hover:!text-white' : 'border-[var(--line)] bg-white text-[var(--ink)]'}>{label}</Button>;
 }
 
-function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
-  return <div><p className="mb-1.5 text-xs font-medium">{label}</p><div className="flex flex-wrap gap-1">{children}</div></div>;
+function CollapsibleFilterGroup({ label, selectedCount, children }: { label: string; selectedCount: number; children: ReactNode }) {
+  return <details open className="rounded-lg border border-[var(--line)] bg-[var(--soft)]/45">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2 text-xs font-medium marker:content-none">
+      <span>{label}</span>
+      <span className={selectedCount > 0 ? 'rounded-full bg-[var(--red)] px-1.5 py-0.5 text-[10px] text-white' : 'text-[var(--muted)]'}>{selectedCount > 0 ? selectedCount + '件選択中' : '開く／しまう'}</span>
+    </summary>
+    <div className="border-t border-[var(--line)] px-2.5 py-2.5"><div className="flex flex-wrap gap-1.5">{children}</div></div>
+  </details>;
 }
 
 function RangeFilter({ label, min, max, ceiling, step = 1, onMinChange, onMaxChange }: { label: string; min: number; max: number; ceiling: number; step?: number; onMinChange: (value: number) => void; onMaxChange: (value: number) => void }) {
@@ -399,17 +405,11 @@ export default function Home() {
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium marker:content-none"><span>⌘ 条件で絞り込む</span><span className={activeFilterCount > 0 ? 'rounded-full bg-[var(--red)] px-2 py-0.5 text-[10px] text-white' : 'rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--muted)]'}>{activeFilterCount > 0 ? activeFilterCount + '件選択中' : 'すべて'}</span></summary>
             <div className="space-y-4 border-t border-[var(--line)] px-3 pb-3 pt-3">
               <div className="flex items-center justify-between gap-2"><p className="text-xs font-medium">絞り込み条件</p><Button size="xs" variant="ghost" className="text-[var(--red)]" onClick={resetCardSearch}>リセット</Button></div>
-              <FilterGroup label="種類">{cardTypes.map((type) => <FilterPill key={type} label={type} active={selectedTypes.includes(type)} onClick={() => { setSelectedTypes((values) => toggleFilterValue(values, type)); setCatalogLimit(80); }} />)}</FilterGroup>
-              <FilterGroup label="色">{colorOptions.map((color) => <FilterPill key={color} label={color === '無' ? '無色' : color} active={selectedColors.includes(color)} onClick={() => { setSelectedColors((values) => toggleFilterValue(values, color)); setCatalogLimit(80); }} />)}</FilterGroup>
-              <FilterGroup label="レアリティ">{rarityOptions.map((rarity) => <FilterPill key={rarity} label={rarity} active={selectedRarities.includes(rarity)} onClick={() => { setSelectedRarities((values) => toggleFilterValue(values, rarity)); setCatalogLimit(80); }} />)}</FilterGroup>
-              <FilterGroup label="収録">{releaseOptions.map((release) => <FilterPill key={release} label={releaseLabel(release)} active={selectedReleases.includes(release)} onClick={() => { setSelectedReleases((values) => toggleFilterValue(values, release)); setCatalogLimit(80); }} />)}</FilterGroup>
-              <details open className="rounded-lg border border-[var(--line)] bg-[var(--soft)]/45">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2 text-xs font-medium marker:content-none">
-                  <span>特性・能力語・遺業</span>
-                  <span className={selectedKeywords.length > 0 ? 'rounded-full bg-[var(--red)] px-1.5 py-0.5 text-[10px] text-white' : 'text-[var(--muted)]'}>{selectedKeywords.length > 0 ? selectedKeywords.length + '件選択中' : '開く／しまう'}</span>
-                </summary>
-                <div className="border-t border-[var(--line)] px-2.5 py-2.5"><div className="flex flex-wrap gap-1.5">{abilityKeywordOptions.map((keyword) => <FilterPill key={keyword} label={keyword} active={selectedKeywords.includes(keyword)} onClick={() => { setSelectedKeywords((values) => toggleFilterValue(values, keyword)); setCatalogLimit(80); }} />)}</div></div>
-              </details>
+              <CollapsibleFilterGroup label="種類" selectedCount={selectedTypes.length}>{cardTypes.map((type) => <FilterPill key={type} label={type} active={selectedTypes.includes(type)} onClick={() => { setSelectedTypes((values) => toggleFilterValue(values, type)); setCatalogLimit(80); }} />)}</CollapsibleFilterGroup>
+              <CollapsibleFilterGroup label="色" selectedCount={selectedColors.length}>{colorOptions.map((color) => <FilterPill key={color} label={color === '無' ? '無色' : color} active={selectedColors.includes(color)} onClick={() => { setSelectedColors((values) => toggleFilterValue(values, color)); setCatalogLimit(80); }} />)}</CollapsibleFilterGroup>
+              <CollapsibleFilterGroup label="レアリティ" selectedCount={selectedRarities.length}>{rarityOptions.map((rarity) => <FilterPill key={rarity} label={rarity} active={selectedRarities.includes(rarity)} onClick={() => { setSelectedRarities((values) => toggleFilterValue(values, rarity)); setCatalogLimit(80); }} />)}</CollapsibleFilterGroup>
+              <CollapsibleFilterGroup label="収録" selectedCount={selectedReleases.length}>{releaseOptions.map((release) => <FilterPill key={release} label={releaseLabel(release)} active={selectedReleases.includes(release)} onClick={() => { setSelectedReleases((values) => toggleFilterValue(values, release)); setCatalogLimit(80); }} />)}</CollapsibleFilterGroup>
+              <CollapsibleFilterGroup label="特性・能力語・遺業" selectedCount={selectedKeywords.length}>{abilityKeywordOptions.map((keyword) => <FilterPill key={keyword} label={keyword} active={selectedKeywords.includes(keyword)} onClick={() => { setSelectedKeywords((values) => toggleFilterValue(values, keyword)); setCatalogLimit(80); }} />)}</CollapsibleFilterGroup>
               <div className="grid gap-3 sm:grid-cols-2">
                 <RangeFilter label="レベル" min={levelMin} max={levelMax} ceiling={maxCardLevel} onMinChange={setLevelMin} onMaxChange={setLevelMax} />
                 <RangeFilter label="パワー（イジンのみ）" min={powerMin} max={powerMax} ceiling={powerFilterCeiling} step={500} onMinChange={setPowerMin} onMaxChange={setPowerMax} />
