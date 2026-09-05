@@ -1,5 +1,7 @@
 'use client';
 
+/* oxlint-disable jsx-a11y/prefer-tag-over-role, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Compound input primitives use grouped divs; addon clicks only focus their associated input and may contain interactive children. */
+
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 

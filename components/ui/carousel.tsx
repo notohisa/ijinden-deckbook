@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+
+/* oxlint-disable react/react-compiler, jsx-a11y/prefer-tag-over-role -- The carousel effect synchronizes an external Embla API, and ARIA carousel/slide roles are intentional. */
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
 } from 'embla-carousel-react';

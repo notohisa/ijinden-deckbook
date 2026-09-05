@@ -1,17 +1,34 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
+/* oxlint-disable next/no-sync-scripts -- This Vite/GitHub Pages site uses Cloudflare's required module analytics beacon. */
+
 export const metadata: Metadata = {
   title: 'イジンデン デッキ帳',
-  description: 'イジンデンのデッキをこの端末に保存して作成できる、非公式のデッキ作成補助アプリ。',
+  description:
+    'イジンデンのデッキをこの端末に保存して作成できる、非公式のデッキ作成補助アプリ。',
   manifest: '/manifest.webmanifest',
   openGraph: {
     title: 'イジンデン デッキ帳',
-    description: 'イジンデンのデッキをこの端末に保存して作成できる、非公式のデッキ作成補助アプリ。',
+    description:
+      'イジンデンのデッキをこの端末に保存して作成できる、非公式のデッキ作成補助アプリ。',
     images: ['/og.png'],
   },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ja"><body>{children}<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon={'{"token":"d72e2fc6487c4978831a721f916e786f"}'} /></body></html>;
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="ja">
+      <body>
+        {children}
+        <script
+          type="module"
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon={'{"token":"d72e2fc6487c4978831a721f916e786f"}'}
+        />
+      </body>
+    </html>
+  );
 }

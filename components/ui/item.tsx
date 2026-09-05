@@ -1,4 +1,6 @@
 import * as React from 'react';
+
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- ItemGroup is a generic visual list whose children are not necessarily list items. */
 import { mergeProps } from '@base-ui/react/merge-props';
 import { useRender } from '@base-ui/react/use-render';
 import { cva, type VariantProps } from 'class-variance-authority';

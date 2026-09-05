@@ -1,5 +1,7 @@
 import * as React from 'react';
 
+/* oxlint-disable jsx-a11y/anchor-has-content -- Base UI's render prop supplies the visible Button children to this anchor at runtime. */
+
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {

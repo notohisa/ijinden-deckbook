@@ -2,6 +2,8 @@ import { mergeProps } from '@base-ui/react/merge-props';
 import { useRender } from '@base-ui/react/use-render';
 import { cva, type VariantProps } from 'class-variance-authority';
 
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- This generic compound control needs a group role without imposing fieldset semantics on its callers. */
+
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 

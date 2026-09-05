@@ -1,5 +1,7 @@
 'use client';
 
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- This generic field layout may contain multiple controls and intentionally supplies group semantics. */
+
 import { useMemo } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
