@@ -3,6 +3,7 @@
 import { type ChangeEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
 import { customCards, type CustomIjindenCard } from '@/app/custom-cards';
 
@@ -21,6 +22,9 @@ type CardType = (typeof cardTypes)[number];
 type SortBy = 'official' | 'level' | 'power' | 'type' | 'color' | 'name';
 type SortDirection = 'asc' | 'desc';
 const colorOptions = ['赤', '青', '緑', '黄', '紫', '無'] as const;
+const catalogColorTints: Record<string, string> = {
+  赤: '#f9d2ca', 青: '#d7e8f7', 緑: '#d9eddf', 黄: '#fff0bb', 紫: '#e9dcf3', 無: '#e8edf0',
+};
 const abilityKeywordOptions = [
   '剣術', '美術', '音楽', '思想', '医術', '志願',
   '航海', '執筆', '決起', '徴募', '魔導', '勝鬨', '躍進', '魔力化', '冥府発動', '復元', '反魂', '木霊', '喪神',
@@ -112,14 +116,11 @@ function RangeFilter({ label, min, max, ceiling, step = 1, onMinChange, onMaxCha
 }
 
 function CatalogCardCounter({ label, count, onDecrease, onIncrease }: { label: string; count: number; onDecrease: () => void; onIncrease: () => void }) {
-  return <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
-    <h3 className="border-b border-[var(--line)] px-2 py-1 text-center text-[11px] font-medium tracking-wide text-[var(--muted)]">{label}</h3>
-    <div className="grid grid-cols-[1fr_1.1fr_1fr]">
-      <Button type="button" variant="ghost" disabled={count === 0} onClick={onDecrease} aria-label={label + 'から1枚減らす'} className="h-9 rounded-none border-r border-[var(--line)] text-lg text-[var(--muted)]">−</Button>
-      <output aria-label={label + 'に入っている枚数'} className="grid h-9 place-items-center font-display text-xl">{count}</output>
-      <Button type="button" variant="ghost" onClick={onIncrease} aria-label={label + 'に1枚追加する'} className="h-9 rounded-none border-l border-[var(--line)] text-lg text-[var(--ink)]">＋</Button>
-    </div>
-  </section>;
+  return <div role="group" aria-label={label + 'の枚数'} className="grid min-w-0 grid-cols-3 overflow-hidden rounded-md border border-[var(--line)] bg-white">
+    <Button type="button" variant="ghost" disabled={count === 0} onClick={onDecrease} aria-label={label + 'から1枚減らす'} className="h-11 min-w-0 touch-manipulation rounded-none border-r border-[var(--line)] px-0 text-base text-[var(--muted)]">−</Button>
+    <output aria-label={label + 'に入っている枚数'} className="grid h-11 min-w-0 place-items-center text-base tabular-nums">{count}</output>
+    <Button type="button" variant="ghost" onClick={onIncrease} aria-label={label + 'に1枚追加する'} className="h-11 min-w-0 touch-manipulation rounded-none border-l border-[var(--line)] px-0 text-base text-[var(--ink)]">＋</Button>
+  </div>;
 }
 
 export default function Home() {
@@ -421,31 +422,37 @@ export default function Home() {
               </div>
             </div>
           </details>
-          <div className="max-h-[calc(100vh-180px)] space-y-2 overflow-y-auto pr-1 lg:max-h-[calc(100vh-180px)]">
-            {visibleCards.map((card) => {
-              const mainInDeck = activeDeck.main[card.id] ?? 0;
-              const sideInDeck = activeDeck.side[card.id] ?? 0;
-              const inDeck = mainInDeck + sideInDeck;
-              return <article key={card.id} className="rounded-xl border border-transparent bg-[var(--soft)] p-3 transition hover:border-[var(--line)] hover:bg-white">
-                <button type="button" onClick={() => selectCard(card.id)} aria-label={card.name + 'の詳細を開く'} className="group w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]">
-                  <div className="flex items-start gap-3">
-                    <img src={card.imageUrl} alt={card.name + 'のカード画像'} loading="lazy" className="h-[92px] w-[66px] shrink-0 rounded-md border border-black/15 bg-white object-cover object-top shadow-sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2"><div><h2 className="font-display text-[15px] tracking-wide">{card.name}</h2><p className="mt-0.5 text-[11px] text-[var(--muted)]">{card.cardType} · {card.id} · {card.rarity} · {card.color} · Lv.{card.level ?? '-'}</p></div>{inDeck > 0 && <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-medium text-white">計×{inDeck}</span>}</div>
-                      <p className="mt-1 text-[10px] text-[var(--muted)]">{card.release}{card.power !== null ? ' · パワー ' + card.power : ''}</p>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">{card.description || card.trait || '公式カード情報'}</p>
-                      <p className="mt-2 text-[11px] font-medium text-[var(--red)]">カード詳細を見る</p>
-                    </div>
-                  </div>
-                </button>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <CatalogCardCounter label="メイン" count={mainInDeck} onDecrease={() => adjustCard(card.id, 'main', -1)} onIncrease={() => adjustCard(card.id, 'main', 1)} />
-                  <CatalogCardCounter label="サイド" count={sideInDeck} onDecrease={() => adjustCard(card.id, 'side', -1)} onIncrease={() => adjustCard(card.id, 'side', 1)} />
-                </div>
-              </article>;
-            })}
-            {visibleCards.length === 0 && <p className="rounded-xl bg-[var(--soft)] px-3 py-8 text-center text-xs text-[var(--muted)]">一致するカードがありません。</p>}
-            {visibleCards.length < matchingCards.length && <Button variant="outline" className="w-full border-[var(--line)] bg-white" onClick={() => setCatalogLimit((limit) => limit + 80)}>さらにカードを表示（残り {matchingCards.length - visibleCards.length}件）</Button>}
+          <div className="-mx-3 max-h-[calc(100vh-180px)] overflow-y-auto sm:mx-0">
+            <Table aria-label="カード選択一覧" className="min-w-[18rem] table-fixed text-sm">
+              <TableHeader className="bg-[var(--mist)]/70">
+                <TableRow className="border-[var(--line)] hover:bg-transparent">
+                  <TableHead scope="col" className="w-12 px-1 text-center font-bold sm:w-20">ID</TableHead>
+                  <TableHead scope="col" className="px-2 font-bold">カード名</TableHead>
+                  <TableHead scope="col" className="w-20 px-1 text-center font-bold sm:w-36">メイン</TableHead>
+                  <TableHead scope="col" className="w-20 px-1 text-center font-bold sm:w-36">サイド</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleCards.map((card) => {
+                  const mainInDeck = activeDeck.main[card.id] ?? 0;
+                  const sideInDeck = activeDeck.side[card.id] ?? 0;
+                  const tints = Array.from(card.color).map((color) => catalogColorTints[color] ?? catalogColorTints['無']);
+                  const idBackground = tints.length > 1 ? 'linear-gradient(135deg, ' + tints.join(', ') + ')' : tints[0];
+                  return <TableRow key={card.id} className={'border-[var(--line)] ' + (mainInDeck + sideInDeck > 0 ? 'bg-[var(--mist)]/70' : 'bg-white/70')}>
+                    <TableCell className="whitespace-normal break-all px-1 py-2 text-center text-xs text-[var(--ink)] sm:text-sm" style={{ background: idBackground }}><span aria-label={card.color + '色・' + card.id}>{card.id}</span></TableCell>
+                    <TableCell className="whitespace-normal px-1 py-1 sm:px-2">
+                      <button type="button" onClick={() => selectCard(card.id)} aria-label={card.name + '（' + card.id + '）の詳細を開く'} className="block min-h-11 w-full touch-manipulation rounded px-1 py-1 text-left text-base leading-6 break-words hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]">
+                        <span aria-hidden="true">🔍</span>{card.name}
+                      </button>
+                    </TableCell>
+                    <TableCell className="px-1 py-2"><CatalogCardCounter label={card.name + '（' + card.id + '）のメイン'} count={mainInDeck} onDecrease={() => adjustCard(card.id, 'main', -1)} onIncrease={() => adjustCard(card.id, 'main', 1)} /></TableCell>
+                    <TableCell className="px-1 py-2"><CatalogCardCounter label={card.name + '（' + card.id + '）のサイド'} count={sideInDeck} onDecrease={() => adjustCard(card.id, 'side', -1)} onIncrease={() => adjustCard(card.id, 'side', 1)} /></TableCell>
+                  </TableRow>;
+                })}
+                {visibleCards.length === 0 && <TableRow><TableCell colSpan={4} className="whitespace-normal px-3 py-8 text-center text-sm text-[var(--muted)]">一致するカードがありません。</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+            {visibleCards.length < matchingCards.length && <Button variant="outline" className="mt-2 w-full border-[var(--line)] bg-white" onClick={() => setCatalogLimit((limit) => limit + 80)}>さらにカードを表示（残り {matchingCards.length - visibleCards.length}件）</Button>}
           </div>
         </section>}
 
