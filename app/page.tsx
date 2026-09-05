@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ijindenCards, type IjindenCard } from '@/app/ijinden-cards';
 import { customCards, type CustomIjindenCard } from '@/app/custom-cards';
+import { DeckSimulator } from '@/components/deck-simulator';
 
 type Pile = 'main' | 'side';
 type Card = IjindenCard | CustomIjindenCard;
@@ -14,7 +15,7 @@ type Deck = { id: string; name: string; main: Record<string, number>; side: Reco
 type ArchiveData = { version: 2; updatedAt: string; decks: Deck[]; draft: Deck };
 type LegacyArchiveData = { version: 1; updatedAt: string; decks: Deck[] };
 type MyDeckExport = { version: 1; type: 'ijinden-deckbook-my-decks'; exportedAt: string; decks: Deck[] };
-type AppTab = 'cards' | 'recipe' | 'myDecks' | 'help';
+type AppTab = 'cards' | 'recipe' | 'myDecks' | 'simulator' | 'help';
 
 const cards: Card[] = [...ijindenCards, ...customCards];
 const cardTypes = ['イジン', 'ハイケイ', 'マホウ', 'マリョク'] as const;
@@ -388,10 +389,10 @@ export default function Home() {
           </div>
         </div>
         <nav className="mx-auto max-w-[1180px] overflow-x-auto px-4 sm:px-6" aria-label="メインメニュー">
-          <div className="flex min-w-max gap-1" role="tablist" aria-label="デッキ帳のタブ">
+          <div className="flex min-w-max gap-0.5 sm:gap-1" role="tablist" aria-label="デッキ帳のタブ">
             {([
-              ['cards', 'カード'], ['recipe', 'レシピ'], ['myDecks', 'マイデッキ'], ['help', 'ヘルプ'],
-            ] as Array<[AppTab, string]>).map(([tab, label]) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)} className={'border-b-2 px-4 py-3 text-sm font-medium transition ' + (activeTab === tab ? 'border-[var(--red)] text-[var(--red)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]')}>{label}</button>)}
+              ['cards', 'カード'], ['recipe', 'レシピ'], ['myDecks', 'マイデッキ'], ['simulator', 'シミュ'], ['help', 'ヘルプ'],
+            ] as Array<[AppTab, string]>).map(([tab, label]) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)} className={'border-b-2 px-1 py-3 text-sm font-medium transition min-[360px]:px-2 sm:px-4 ' + (activeTab === tab ? 'border-[var(--red)] text-[var(--red)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]')}>{label}</button>)}
           </div>
         </nav>
       </header>
@@ -472,12 +473,14 @@ export default function Home() {
             </div>
           </div>
           <div className="p-4 sm:p-5">
-            <div className="mb-4"><Button type="button" variant="outline" className="w-full border-[var(--line)] bg-[var(--paper)]" onClick={() => setActiveTab('cards')}>⌕ カードタブを開く</Button></div>
+            <div className="mb-4 grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" className="h-11 w-full border-[var(--line)] bg-[var(--paper)]" onClick={() => setActiveTab('cards')}>⌕ カードタブを開く</Button><Button type="button" variant="outline" className="h-11 w-full border-[var(--line)] bg-[var(--paper)]" onClick={() => setActiveTab('simulator')}>シミュレーションを開く</Button></div>
             <DeckPile title="メインデッキ" pile="main" deck={activeDeck} onAdjust={adjustCard} onMoveCard={moveCard} onSelectCard={selectCard} />
             <DeckPile title="サイドデッキ" pile="side" deck={activeDeck} onAdjust={adjustCard} onMoveCard={moveCard} onSelectCard={selectCard} />
           </div>
           <div className="border-t border-[var(--line)] bg-[var(--soft)] px-4 py-3 sm:px-5"><p className="flex items-start gap-2 text-xs leading-5 text-[var(--muted)]"><span className="text-[var(--green)]">●</span>{notice}</p></div>
         </section>}
+
+        <DeckSimulator active={activeTab === 'simulator'} recipeName={activeDeck.name} main={activeDeck.main} cardsById={cardsById} onEditRecipe={() => setActiveTab('recipe')} />
 
         {activeTab === 'myDecks' && <section className="mx-auto max-w-2xl space-y-4" role="tabpanel" aria-label="マイデッキ">
           <section className="rounded-2xl border border-[var(--line)] bg-white/75 p-3">
@@ -499,6 +502,7 @@ export default function Home() {
             <section><h2 className="font-display text-lg">カード</h2><p className="mt-1 text-[var(--muted)]">名前・能力文・特性・カード番号から探せます。各カードのメイン／サイドの＋・−で、その場で枚数を調整できます。</p></section>
             <section><h2 className="font-display text-lg">レシピ</h2><p className="mt-1 text-[var(--muted)]">編集中のデッキの合計枚数、種類別枚数、メインデッキ、サイドデッキを確認できます。レシピのカード画像左下に枚数を表示します。メイン40枚で完成表示になります。</p></section>
             <section><h2 className="font-display text-lg">マイデッキ</h2><p className="mt-1 text-[var(--muted)]">レシピタブで「マイデッキに保存」を押したデッキだけを表示します。保存済みデッキの切り替え、名前変更、削除、新しいデッキの作成を行えます。</p></section>
+            <section><h2 className="font-display text-lg">シミュレーション</h2><p className="mt-1 text-[var(--muted)]">「シミュ」タブで、レシピのメインデッキを使って一人回しを試せます。10枚以上で開始でき、初期手札は6枚、ガーディアンは4枚です。操作前に1回だけ手札を引き直せます。「1枚引く」でドローし、カードをタップすると裏面の確認や色マークの変更ができます。効果や対戦の自動処理はありません。レシピ・マイデッキは変更されず、シミュレーションの進行は再読み込み時にリセットされます。</p></section>
             <section><h2 className="font-display text-lg">エクスポート・インポート</h2><p className="mt-1 text-[var(--muted)]">この端末では、保存済みマイデッキと作業中レシピを自動保存します。上部の「エクスポート」で保存済みマイデッキだけをJSONファイルに出力し、別の端末で「インポート」すると追加・更新できます。同じ名前の保存済みデッキがある場合は、インポートした内容で上書きします。作業中レシピは出力されません。</p></section>
             <section><h2 className="font-display text-lg">アクセス解析</h2><p className="mt-1 text-[var(--muted)]">ページ閲覧数と訪問者数の把握に、Cloudflare Web Analyticsを使用しています。マイデッキの内容、デッキ名、カード選択や検索語は送信しません。</p><a className="mt-2 inline-block text-xs text-[var(--red)] underline underline-offset-2" href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noreferrer">Cloudflareのプライバシーについて ↗</a></section>
             <section className="rounded-xl bg-[var(--soft)] p-4 text-xs text-[var(--muted)]"><p className="font-medium text-[var(--ink)]">公式カードデータについて</p><p className="mt-1">全576種の名称・能力文と画像はイジンデン公式カードリストを参照しています。画像は公式サイトから直接表示します。</p><a className="mt-2 inline-block text-[var(--red)] underline underline-offset-2" href="https://one-draw.jp/ijinden/cardlist.html" target="_blank" rel="noreferrer">公式カードリストを開く ↗</a></section>
