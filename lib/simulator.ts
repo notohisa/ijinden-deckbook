@@ -63,8 +63,8 @@ function cloneState(state: SimulationState): SimulationState {
   return { zones };
 }
 
-function shuffleCards(
-  cards: SimulationCard[],
+export function shuffleSimulationCards<T>(
+  cards: T[],
   random: () => number = Math.random,
 ): void {
   for (let index = cards.length - 1; index > 0; index -= 1) {
@@ -209,7 +209,7 @@ export function createSimulation(
     };
   });
 
-  shuffleCards(cards, random);
+  shuffleSimulationCards(cards, random);
 
   const guardiansEnd = guardianSize;
   const handEnd = guardiansEnd + handSize;
@@ -283,7 +283,7 @@ export function mulliganSimulation(
     throw new Error('not enough cards for the mulligan hand');
   }
 
-  shuffleCards(movableCards, random);
+  shuffleSimulationCards(movableCards, random);
   const guardians = state.zones.guardians.map((card) =>
     resetCardForZone(card, 'guardians'),
   );

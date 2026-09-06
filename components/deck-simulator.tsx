@@ -2,8 +2,17 @@
 
 /* oxlint-disable next/no-img-element -- GitHub Pages renders official card URLs with standard images, without a Next.js image server. */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { IjindenCard } from '@/app/ijinden-cards';
+import { SimpleSimulator } from '@/components/simple-simulator';
+import {
+  SimulatorModeToggle,
+  type SimulationViewMode,
+} from '@/components/simulator-mode-toggle';
+import type {
+  DeckSimulatorProps,
+  SimulatorSession,
+} from '@/components/simulator-types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,45 +44,107 @@ import {
   toggleSimulationCardGrayedOut,
   unequipSimulationCard,
   type SimulationCard,
-  type SimulationCardSeed,
-  type SimulationState,
   type SimulationZone,
 } from '@/lib/simulator';
+import {
+  buildSimulationRecipe,
+  SIMULATION_GUARDIAN_SIZE,
+  SIMULATION_HAND_SIZE,
+  type SimulationRecipe,
+} from '@/lib/simulator-recipe';
 
-const HAND_SIZE = 6;
-const GUARDIAN_SIZE = 4;
-// Bound expansion of imported counts; a regular 40-card recipe is well below this limit.
-const MAX_SIMULATION_CARDS = 1000;
+const MODE_STORAGE_KEY = 'ijinden-deckbook:simulator-view-mode';
+const BOARD_COLLAPSE_STORAGE_KEY =
+  'ijinden-deckbook:simulator-board-collapsed-zones';
 
 const zoneNames: Record<SimulationZone, string> = {
   deck: '山札',
   hand: '手札',
   battlefield: '戦場',
-  mana: 'マリョクゾーン',
+  mana: 'マリョク',
   graveyard: '墓地',
   guardians: 'ガーディアン',
 };
 
-type Session = {
-  board: SimulationState;
-  recipeSignature: string;
-  recipeName: string;
-  canMulligan: boolean;
-  drawn: number;
-};
+type BoardZone = Exclude<SimulationZone, 'deck'>;
 
-type Props = {
-  active: boolean;
-  recipeName: string;
-  main: Record<string, number>;
-  cardsById: ReadonlyMap<string, IjindenCard>;
-  onEditRecipe: () => void;
+type BoardCollapseState = Record<BoardZone, boolean>;
+
+type BoardSimulatorProps = DeckSimulatorProps & {
+  mode: SimulationViewMode;
+  onModeChange: (mode: SimulationViewMode) => void;
+  session: SimulatorSession | null;
+  recipe: SimulationRecipe;
+  onStart: () => void;
+  onDraw: () => void;
+  onMulligan: () => void;
+  onUpdateSession: (
+    update: (session: SimulatorSession) => SimulatorSession,
+  ) => void;
 };
 
 type MoveDestination = {
   zone: SimulationZone;
   label: string;
 };
+
+function isSmallScreen(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(max-width: 767px)').matches
+  );
+}
+
+function getInitialViewMode(): SimulationViewMode {
+  if (typeof window === 'undefined') return 'board';
+  try {
+    const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
+    if (stored === 'simple' || stored === 'board') return stored;
+  } catch {
+    // A blocked localStorage must not prevent the simulator from opening.
+  }
+  return isSmallScreen() ? 'simple' : 'board';
+}
+
+function getDefaultBoardCollapseState(): BoardCollapseState {
+  const compact = isSmallScreen();
+  return {
+    hand: false,
+    battlefield: false,
+    mana: compact,
+    graveyard: compact,
+    guardians: compact,
+  };
+}
+
+function getInitialBoardCollapseState(): BoardCollapseState {
+  const defaults = getDefaultBoardCollapseState();
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(BOARD_COLLAPSE_STORAGE_KEY) ?? 'null',
+    ) as Partial<Record<BoardZone, unknown>> | null;
+    if (!stored || typeof stored !== 'object') return defaults;
+    return {
+      hand: typeof stored.hand === 'boolean' ? stored.hand : defaults.hand,
+      battlefield:
+        typeof stored.battlefield === 'boolean'
+          ? stored.battlefield
+          : defaults.battlefield,
+      mana: typeof stored.mana === 'boolean' ? stored.mana : defaults.mana,
+      graveyard:
+        typeof stored.graveyard === 'boolean'
+          ? stored.graveyard
+          : defaults.graveyard,
+      guardians:
+        typeof stored.guardians === 'boolean'
+          ? stored.guardians
+          : defaults.guardians,
+    };
+  } catch {
+    return defaults;
+  }
+}
 
 function isManaOrMagic(card: IjindenCard): boolean {
   return card.cardType === 'マリョク' || card.cardType === 'マホウ';
@@ -89,18 +160,18 @@ function getMoveDestinations(
     case 'hand':
       return isManaOrMagic(card)
         ? [
-            { zone: 'mana', label: 'マリョクゾーンへ' },
+            { zone: 'mana', label: 'マリョクへ' },
             { zone: 'graveyard', label: '墓地へ' },
           ]
         : [
             { zone: 'battlefield', label: '戦場へ' },
-            { zone: 'mana', label: 'マリョクゾーンへ' },
+            { zone: 'mana', label: 'マリョクへ' },
             { zone: 'graveyard', label: '墓地へ' },
           ];
     case 'battlefield':
       return [
         { zone: 'hand', label: '手札へ' },
-        { zone: 'mana', label: 'マリョクゾーンへ' },
+        { zone: 'mana', label: 'マリョクへ' },
         { zone: 'graveyard', label: '墓地へ' },
       ];
     case 'mana':
@@ -118,17 +189,17 @@ function getMoveDestinations(
       return isManaOrMagic(card)
         ? [
             { zone: 'hand', label: '手札へ' },
-            { zone: 'mana', label: 'マリョクゾーンへ' },
+            { zone: 'mana', label: 'マリョクへ' },
           ]
         : [
             { zone: 'battlefield', label: '戦場へ' },
             { zone: 'hand', label: '手札へ' },
-            { zone: 'mana', label: 'マリョクゾーンへ' },
+            { zone: 'mana', label: 'マリョクへ' },
           ];
     case 'guardians':
       return [
         { zone: 'hand', label: '手札へ' },
-        { zone: 'mana', label: 'マリョクゾーンへ' },
+        { zone: 'mana', label: 'マリョクへ' },
         { zone: 'graveyard', label: '墓地へ' },
       ];
     case 'deck':
@@ -136,14 +207,114 @@ function getMoveDestinations(
   }
 }
 
-export function DeckSimulator({
+export function DeckSimulator(props: DeckSimulatorProps) {
+  const [mode, setMode] = useState<SimulationViewMode>(getInitialViewMode);
+  const [session, setSession] = useState<SimulatorSession | null>(null);
+  const recipe = useMemo(
+    () => buildSimulationRecipe(props.main, props.cardsById),
+    [props.main, props.cardsById],
+  );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(MODE_STORAGE_KEY, mode);
+    } catch {
+      // Preference storage is optional.
+    }
+  }, [mode]);
+
+  function start() {
+    if (recipe.error) return;
+    setSession({
+      board: createSimulation(
+        recipe.cardInputs,
+        SIMULATION_HAND_SIZE,
+        SIMULATION_GUARDIAN_SIZE,
+      ),
+      recipeSignature: recipe.signature,
+      recipeName: props.recipeName.trim() || '名前のないデッキ',
+      canMulligan: true,
+      drawn: 0,
+      simpleStates: {},
+    });
+  }
+
+  function updateSession(
+    update: (current: SimulatorSession) => SimulatorSession,
+  ) {
+    setSession((current) => (current ? update(current) : current));
+  }
+
+  function draw() {
+    updateSession((current) =>
+      current.board.zones.deck.length > 0
+        ? {
+            ...current,
+            board: drawSimulationCards(current.board),
+            canMulligan: false,
+            drawn: current.drawn + 1,
+          }
+        : current,
+    );
+  }
+
+  function mulligan() {
+    updateSession((current) =>
+      current.canMulligan
+        ? {
+            ...current,
+            board: mulliganSimulation(current.board, SIMULATION_HAND_SIZE),
+            canMulligan: false,
+            drawn: 0,
+            simpleStates: {},
+          }
+        : current,
+    );
+  }
+
+  return (
+    <>
+      <BoardSimulator
+        {...props}
+        active={props.active && mode === 'board'}
+        mode={mode}
+        onModeChange={setMode}
+        session={session}
+        recipe={recipe}
+        onStart={start}
+        onDraw={draw}
+        onMulligan={mulligan}
+        onUpdateSession={updateSession}
+      />
+      <SimpleSimulator
+        {...props}
+        active={props.active && mode === 'simple'}
+        mode={mode}
+        onModeChange={setMode}
+        session={session}
+        recipe={recipe}
+        onStart={start}
+        onMulligan={mulligan}
+        onUpdateSession={updateSession}
+      />
+    </>
+  );
+}
+
+function BoardSimulator({
   active,
   recipeName,
-  main,
   cardsById,
   onEditRecipe,
-}: Props) {
-  const [session, setSession] = useState<Session | null>(null);
+  mode,
+  onModeChange,
+  session,
+  recipe,
+  onStart,
+  onDraw,
+  onMulligan,
+  onUpdateSession,
+}: BoardSimulatorProps) {
   const [message, setMessage] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
@@ -151,52 +322,27 @@ export function DeckSimulator({
   );
   const [equipSourceId, setEquipSourceId] = useState<string | null>(null);
   const [detailCardId, setDetailCardId] = useState<string | null>(null);
+  const [collapsedZones, setCollapsedZones] = useState<BoardCollapseState>(
+    getInitialBoardCollapseState,
+  );
 
-  const recipe = useMemo(() => {
-    const entries = Object.entries(main).sort(([left], [right]) =>
-      left.localeCompare(right),
-    );
-    const signature = JSON.stringify(entries);
-    if (
-      entries.some(
-        ([id, count]) =>
-          !cardsById.has(id) || !Number.isSafeInteger(count) || count < 1,
-      )
-    ) {
-      return {
-        signature,
-        cardInputs: [] as SimulationCardSeed[],
-        error: 'レシピのカード情報を確認してください。',
-      };
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        BOARD_COLLAPSE_STORAGE_KEY,
+        JSON.stringify(collapsedZones),
+      );
+    } catch {
+      // Zone visibility is a convenience preference only.
     }
-    const total = entries.reduce((sum, [, count]) => sum + count, 0);
-    if (total < HAND_SIZE + GUARDIAN_SIZE) {
-      return {
-        signature,
-        cardInputs: [] as SimulationCardSeed[],
-        error: '開始するには、メインデッキに10枚以上入れてください。',
-      };
-    }
-    if (total > MAX_SIMULATION_CARDS) {
-      return {
-        signature,
-        cardInputs: [] as SimulationCardSeed[],
-        error: 'シミュレーションで扱えるメインデッキは1000枚までです。',
-      };
-    }
-    return {
-      signature,
-      cardInputs: entries.flatMap(([id, count]) => {
-        const card = cardsById.get(id);
-        return Array.from({ length: count }, () => ({
-          cardId: id,
-          cardType: card?.cardType,
-          description: card?.description,
-        }));
-      }),
-      error: '',
-    };
-  }, [main, cardsById]);
+  }, [collapsedZones]);
+
+  function toggleZone(zone: BoardZone) {
+    setCollapsedZones((current) => ({
+      ...current,
+      [zone]: !current[zone],
+    }));
+  }
 
   const detailCard = detailCardId ? cardsById.get(detailCardId) : undefined;
   const selectedInstance =
@@ -229,13 +375,7 @@ export function DeckSimulator({
 
   function start() {
     if (recipe.error) return;
-    setSession({
-      board: createSimulation(recipe.cardInputs, HAND_SIZE, GUARDIAN_SIZE),
-      recipeSignature: recipe.signature,
-      recipeName: recipeName.trim() || '名前のないデッキ',
-      canMulligan: true,
-      drawn: 0,
-    });
+    onStart();
     setConfirmReset(false);
     setSelectedInstanceId(null);
     setEquipSourceId(null);
@@ -246,31 +386,13 @@ export function DeckSimulator({
   function draw() {
     if (!session || session.board.zones.deck.length === 0) return;
     const remaining = session.board.zones.deck.length - 1;
-    setSession((current) =>
-      current && current.board.zones.deck.length > 0
-        ? {
-            ...current,
-            board: drawSimulationCards(current.board),
-            canMulligan: false,
-            drawn: current.drawn + 1,
-          }
-        : current,
-    );
+    onDraw();
     setMessage('1枚引きました。山札は残り' + String(remaining) + '枚です。');
   }
 
   function mulligan() {
     if (!session?.canMulligan) return;
-    setSession((current) =>
-      current?.canMulligan
-        ? {
-            ...current,
-            board: mulliganSimulation(current.board, HAND_SIZE),
-            canMulligan: false,
-            drawn: 0,
-          }
-        : current,
-    );
+    onMulligan();
     setSelectedInstanceId(null);
     setEquipSourceId(null);
     setMessage('初期状態へ戻して、手札を引き直しました。');
@@ -278,19 +400,15 @@ export function DeckSimulator({
 
   function moveCard(instance: SimulationCard, destination: SimulationZone) {
     const card = cardsById.get(instance.cardId);
-    setSession((current) =>
-      current
-        ? {
-            ...current,
-            board: moveSimulationCard(
-              current.board,
-              instance.instanceId,
-              destination,
-            ),
-            canMulligan: false,
-          }
-        : current,
-    );
+    onUpdateSession((current) => ({
+      ...current,
+      board: moveSimulationCard(
+        current.board,
+        instance.instanceId,
+        destination,
+      ),
+      canMulligan: false,
+    }));
     setSelectedInstanceId(null);
     setEquipSourceId(null);
     setMessage(
@@ -302,33 +420,25 @@ export function DeckSimulator({
   }
 
   function flipCard(instance: SimulationCard) {
-    setSession((current) =>
-      current
-        ? {
-            ...current,
-            board: flipSimulationCard(current.board, instance.instanceId),
-            canMulligan: false,
-          }
-        : current,
-    );
+    onUpdateSession((current) => ({
+      ...current,
+      board: flipSimulationCard(current.board, instance.instanceId),
+      canMulligan: false,
+    }));
     setSelectedInstanceId(null);
     setMessage('ガーディアンを表向きにしました。');
   }
 
   function toggleGray(instance: SimulationCard) {
     const card = cardsById.get(instance.cardId);
-    setSession((current) =>
-      current
-        ? {
-            ...current,
-            board: toggleSimulationCardGrayedOut(
-              current.board,
-              instance.instanceId,
-            ),
-            canMulligan: false,
-          }
-        : current,
-    );
+    onUpdateSession((current) => ({
+      ...current,
+      board: toggleSimulationCardGrayedOut(
+        current.board,
+        instance.instanceId,
+      ),
+      canMulligan: false,
+    }));
     setSelectedInstanceId(null);
     setMessage(
       (card?.name ?? 'カード') +
@@ -340,15 +450,11 @@ export function DeckSimulator({
 
   function unequipCard(instance: SimulationCard) {
     const card = cardsById.get(instance.cardId);
-    setSession((current) =>
-      current
-        ? {
-            ...current,
-            board: unequipSimulationCard(current.board, instance.instanceId),
-            canMulligan: false,
-          }
-        : current,
-    );
+    onUpdateSession((current) => ({
+      ...current,
+      board: unequipSimulationCard(current.board, instance.instanceId),
+      canMulligan: false,
+    }));
     setSelectedInstanceId(null);
     setMessage((card?.name ?? 'カード') + 'の装備を解除しました。');
   }
@@ -362,19 +468,15 @@ export function DeckSimulator({
     if (!equipSource) return;
     const equipmentName = cardsById.get(equipSource.cardId)?.name ?? 'カード';
     const ijinName = cardsById.get(ijinInstance.cardId)?.name ?? 'イジン';
-    setSession((current) =>
-      current
-        ? {
-            ...current,
-            board: equipSimulationCard(
-              current.board,
-              equipSource.instanceId,
-              ijinInstance.instanceId,
-            ),
-            canMulligan: false,
-          }
-        : current,
-    );
+    onUpdateSession((current) => ({
+      ...current,
+      board: equipSimulationCard(
+        current.board,
+        equipSource.instanceId,
+        ijinInstance.instanceId,
+      ),
+      canMulligan: false,
+    }));
     setEquipSourceId(null);
     setMessage(equipmentName + 'を' + ijinName + 'へ装備しました。');
   }
@@ -406,13 +508,18 @@ export function DeckSimulator({
       className="mx-auto max-w-5xl space-y-4"
     >
       <div className="rounded-2xl border border-[var(--line)] bg-white/85 p-4 sm:p-5">
-        <p className="label">ONE-PLAYER SIMULATOR</p>
-        <h1 className="mt-1 font-display text-2xl tracking-wide">
-          シミュレーション
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="label">BOARD SOLO MODE</p>
+            <h1 className="mt-1 font-display text-2xl tracking-wide">
+              シミュレーション
+            </h1>
+          </div>
+          <SimulatorModeToggle mode={mode} onChange={onModeChange} />
+        </div>
         {!session && (
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            レシピのメインデッキを、手札・戦場・マリョクゾーン・墓地で動かせます。サイドデッキは使いません。
+            レシピのメインデッキを、手札・戦場・マリョク・墓地で動かせます。サイドデッキは使いません。
           </p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -499,19 +606,20 @@ export function DeckSimulator({
           </div>
 
           <ZonePanel
-            title="ガーディアン"
-            count={session.board.zones.guardians.length}
-            emptyMessage="ガーディアンはいません。"
-            className="max-w-md grid-cols-4"
+            title="手札"
+            count={session.board.zones.hand.length}
+            meta={'初手6枚 ＋ ドロー' + String(session.drawn) + '枚'}
+            emptyMessage="手札はありません。"
+            collapsed={collapsedZones.hand}
+            onToggle={() => toggleZone('hand')}
           >
-            {session.board.zones.guardians.map((instance, index) => {
+            {session.board.zones.hand.map((instance) => {
               const card = cardsById.get(instance.cardId);
               return card ? (
                 <SimulationCardTile
                   key={instance.instanceId}
                   instance={instance}
                   card={card}
-                  index={index}
                   onTap={() => setSelectedInstanceId(instance.instanceId)}
                 />
               ) : null;
@@ -525,98 +633,89 @@ export function DeckSimulator({
             <ZoneHeading
               title="戦場"
               count={session.board.zones.battlefield.length}
+              collapsed={collapsedZones.battlefield}
+              onToggle={() => toggleZone('battlefield')}
             />
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
-              <BattlefieldLane
-                title="ハイケイ"
-                emptyMessage="戦場のハイケイはありません。"
-              >
-                {battlefieldBackgrounds.map((instance) => {
-                  const card = cardsById.get(instance.cardId);
-                  return card ? (
-                    <SimulationCardTile
-                      key={instance.instanceId}
-                      instance={instance}
-                      card={card}
-                      className="w-24 sm:w-28"
-                      onTap={() => setSelectedInstanceId(instance.instanceId)}
-                    />
-                  ) : null;
-                })}
-              </BattlefieldLane>
-              <BattlefieldLane
-                title="イジン"
-                emptyMessage="戦場のイジンはありません。"
-              >
-                {battlefieldIjins.map((instance) => {
-                  const card = cardsById.get(instance.cardId);
-                  if (!card) return null;
-                  const equipment = session.board.zones.battlefield.filter(
-                    (candidate) =>
-                      candidate.equippedTo === instance.instanceId,
-                  );
-                  return (
-                    <IjinWithEquipment
-                      key={instance.instanceId}
-                      instance={instance}
-                      card={card}
-                      equipment={equipment}
-                      cardsById={cardsById}
-                      onTap={(cardInstance) =>
-                        setSelectedInstanceId(cardInstance.instanceId)
-                      }
-                    />
-                  );
-                })}
-              </BattlefieldLane>
-            </div>
-            {battlefieldOthers.length > 0 && (
-              <div className="mt-4 border-t border-[var(--line)] pt-3">
-                <p className="text-sm font-medium">その他</p>
-                <ul className="mt-2 grid grid-cols-3 gap-2 min-[420px]:grid-cols-4 sm:grid-cols-5">
-                  {battlefieldOthers.map((instance) => {
-                    const card = cardsById.get(instance.cardId);
-                    return card ? (
-                      <SimulationCardTile
-                        key={instance.instanceId}
-                        instance={instance}
-                        card={card}
-                        onTap={() =>
-                          setSelectedInstanceId(instance.instanceId)
-                        }
-                      />
-                    ) : null;
-                  })}
-                </ul>
-              </div>
+            {!collapsedZones.battlefield && (
+              <>
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
+                  <BattlefieldLane
+                    title="ハイケイ"
+                    emptyMessage="戦場のハイケイはありません。"
+                  >
+                    {battlefieldBackgrounds.map((instance) => {
+                      const card = cardsById.get(instance.cardId);
+                      return card ? (
+                        <SimulationCardTile
+                          key={instance.instanceId}
+                          instance={instance}
+                          card={card}
+                          className="w-24 sm:w-28"
+                          onTap={() =>
+                            setSelectedInstanceId(instance.instanceId)
+                          }
+                        />
+                      ) : null;
+                    })}
+                  </BattlefieldLane>
+                  <BattlefieldLane
+                    title="イジン"
+                    emptyMessage="戦場のイジンはありません。"
+                  >
+                    {battlefieldIjins.map((instance) => {
+                      const card = cardsById.get(instance.cardId);
+                      if (!card) return null;
+                      const equipment = session.board.zones.battlefield.filter(
+                        (candidate) =>
+                          candidate.equippedTo === instance.instanceId,
+                      );
+                      return (
+                        <IjinWithEquipment
+                          key={instance.instanceId}
+                          instance={instance}
+                          card={card}
+                          equipment={equipment}
+                          cardsById={cardsById}
+                          onTap={(cardInstance) =>
+                            setSelectedInstanceId(cardInstance.instanceId)
+                          }
+                        />
+                      );
+                    })}
+                  </BattlefieldLane>
+                </div>
+                {battlefieldOthers.length > 0 && (
+                  <div className="mt-4 border-t border-[var(--line)] pt-3">
+                    <p className="text-sm font-medium">その他</p>
+                    <ul className="mt-2 grid grid-cols-3 gap-2 min-[420px]:grid-cols-4 sm:grid-cols-5">
+                      {battlefieldOthers.map((instance) => {
+                        const card = cardsById.get(instance.cardId);
+                        return card ? (
+                          <SimulationCardTile
+                            key={instance.instanceId}
+                            instance={instance}
+                            card={card}
+                            onTap={() =>
+                              setSelectedInstanceId(instance.instanceId)
+                            }
+                          />
+                        ) : null;
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </>
             )}
           </section>
 
           <ZonePanel
-            title="マリョクゾーン"
+            title="マリョク"
             count={session.board.zones.mana.length}
-            emptyMessage="マリョクゾーンは空です。"
+            emptyMessage="マリョクは空です。"
+            collapsed={collapsedZones.mana}
+            onToggle={() => toggleZone('mana')}
           >
             {session.board.zones.mana.map((instance) => {
-              const card = cardsById.get(instance.cardId);
-              return card ? (
-                <SimulationCardTile
-                  key={instance.instanceId}
-                  instance={instance}
-                  card={card}
-                  onTap={() => setSelectedInstanceId(instance.instanceId)}
-                />
-              ) : null;
-            })}
-          </ZonePanel>
-
-          <ZonePanel
-            title="手札"
-            count={session.board.zones.hand.length}
-            meta={'初手6枚 ＋ ドロー' + String(session.drawn) + '枚'}
-            emptyMessage="手札はありません。"
-          >
-            {session.board.zones.hand.map((instance) => {
               const card = cardsById.get(instance.cardId);
               return card ? (
                 <SimulationCardTile
@@ -633,6 +732,8 @@ export function DeckSimulator({
             title="墓地"
             count={session.board.zones.graveyard.length}
             emptyMessage="墓地は空です。"
+            collapsed={collapsedZones.graveyard}
+            onToggle={() => toggleZone('graveyard')}
           >
             {session.board.zones.graveyard.map((instance) => {
               const card = cardsById.get(instance.cardId);
@@ -641,6 +742,28 @@ export function DeckSimulator({
                   key={instance.instanceId}
                   instance={instance}
                   card={card}
+                  onTap={() => setSelectedInstanceId(instance.instanceId)}
+                />
+              ) : null;
+            })}
+          </ZonePanel>
+
+          <ZonePanel
+            title="ガーディアン"
+            count={session.board.zones.guardians.length}
+            emptyMessage="ガーディアンはいません。"
+            className="max-w-md grid-cols-4"
+            collapsed={collapsedZones.guardians}
+            onToggle={() => toggleZone('guardians')}
+          >
+            {session.board.zones.guardians.map((instance, index) => {
+              const card = cardsById.get(instance.cardId);
+              return card ? (
+                <SimulationCardTile
+                  key={instance.instanceId}
+                  instance={instance}
+                  card={card}
+                  index={index}
                   onTap={() => setSelectedInstanceId(instance.instanceId)}
                 />
               ) : null;
@@ -660,7 +783,7 @@ export function DeckSimulator({
               シミュレーションをやり直しますか？
             </AlertDialogTitle>
             <AlertDialogDescription>
-              手札・盤面・マリョクゾーン・墓地・グレーアウト・装備状態をリセットし、最新のレシピをシャッフルして開始します。保存済みマイデッキには影響しません。
+              手札・戦場・マリョク・墓地・グレーアウト・装備状態をリセットし、最新のレシピをシャッフルして開始します。保存済みマイデッキには影響しません。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -893,19 +1016,33 @@ function ZoneHeading({
   title,
   count,
   meta,
+  collapsed,
+  onToggle,
 }: {
   title: string;
   count: number;
   meta?: string;
+  collapsed: boolean;
+  onToggle: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-1">
-      <h2 className="font-display text-lg">
-        {title}{' '}
-        <span className="ml-1 font-sans text-sm text-[var(--muted)]">
-          {count}枚
+      <button
+        type="button"
+        aria-expanded={!collapsed}
+        onClick={onToggle}
+        className="-ml-1 flex min-h-10 items-center gap-2 rounded-md px-1 text-left font-display text-lg hover:bg-[var(--soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
+      >
+        <span aria-hidden="true" className="font-sans text-xs text-[var(--muted)]">
+          {collapsed ? '▶' : '▼'}
         </span>
-      </h2>
+        <span>
+          {title}{' '}
+          <span className="ml-1 font-sans text-sm text-[var(--muted)]">
+            {count}枚
+          </span>
+        </span>
+      </button>
       {meta && <span className="text-xs text-[var(--muted)]">{meta}</span>}
     </div>
   );
@@ -917,6 +1054,8 @@ function ZonePanel({
   meta,
   emptyMessage,
   className = '',
+  collapsed,
+  onToggle,
   children,
 }: {
   title: string;
@@ -924,6 +1063,8 @@ function ZonePanel({
   meta?: string;
   emptyMessage: string;
   className?: string;
+  collapsed: boolean;
+  onToggle: () => void;
   children: React.ReactNode;
 }) {
   const childCount = Array.isArray(children)
@@ -936,12 +1077,18 @@ function ZonePanel({
       className="rounded-2xl border border-[var(--line)] bg-white/75 p-3 sm:p-4"
       aria-label={title}
     >
-      <ZoneHeading title={title} count={count} meta={meta} />
-      {childCount === 0 ? (
+      <ZoneHeading
+        title={title}
+        count={count}
+        meta={meta}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+      {!collapsed && childCount === 0 ? (
         <p className="mt-3 rounded-lg bg-[var(--soft)] px-3 py-5 text-center text-sm text-[var(--muted)]">
           {emptyMessage}
         </p>
-      ) : (
+      ) : !collapsed ? (
         <ul
           className={
             'mt-3 grid grid-cols-3 gap-2 min-[420px]:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 ' +
@@ -950,7 +1097,7 @@ function ZonePanel({
         >
           {children}
         </ul>
-      )}
+      ) : null}
     </section>
   );
 }
