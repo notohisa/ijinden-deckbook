@@ -4,10 +4,20 @@ import type { IjindenCard } from '@/app/ijinden-cards';
 export type Pile = 'main' | 'side';
 export type DeckColor = 'default' | 'orange' | 'gray';
 export type CardType = IjindenCard['cardType'];
+export type EffectProcessKey =
+  | 'destroys'
+  | 'putsInGraveyard'
+  | 'cannotBeDestroyed'
+  | 'cannotLeaveBattlefield'
+  | 'putsOnBottomOfDeck'
+  | 'putsInManaZone';
+export type EffectProcessTags = Record<EffectProcessKey, boolean>;
 /** Optional rule metadata can be added to either official or custom card data. */
 export type AppCard = (IjindenCard | CustomIjindenCard) & {
   /** `null` means the named card is exempt from the normal same-name limit. */
   deckLimit?: number | null;
+  /** Search tags derived once from the card's rule text when the catalog loads. */
+  effectProcessTags?: EffectProcessTags;
 };
 
 export type Deck = {

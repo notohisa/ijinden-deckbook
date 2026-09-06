@@ -11,6 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  effectProcessOptions,
+  matchesEffectProcessFilters,
+  type EffectProcessKey,
+} from '@/lib/card-effect-processes';
 import { cardTypes, countCards } from '@/lib/deck-utils';
 
 type SortBy = 'official' | 'level' | 'power' | 'type' | 'color' | 'name';
@@ -89,6 +94,9 @@ export function CardCatalog({
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
+  const [selectedEffectProcesses, setSelectedEffectProcesses] = useState<
+    EffectProcessKey[]
+  >([]);
   const maxCardLevel = useMemo(
     () => Math.max(17, ...cards.map((card) => card.level ?? 0)),
     [cards],
@@ -163,6 +171,10 @@ export function CardCatalog({
           card.power >= powerMin &&
           card.power <= powerMax);
       const abilityText = card.trait + ' ' + card.description;
+      const matchesEffectProcesses = matchesEffectProcessFilters(
+        card,
+        selectedEffectProcesses,
+      );
       return (
         (!normalized || allText.includes(normalized)) &&
         (selectedTypes.length === 0 || selectedTypes.includes(card.cardType)) &&
@@ -173,6 +185,7 @@ export function CardCatalog({
           selectedReleases.includes(card.release)) &&
         (selectedKeywords.length === 0 ||
           selectedKeywords.some((keyword) => abilityText.includes(keyword))) &&
+        matchesEffectProcesses &&
         matchesLevel &&
         matchesPower
       );
@@ -217,6 +230,7 @@ export function CardCatalog({
     powerMin,
     query,
     selectedColors,
+    selectedEffectProcesses,
     selectedKeywords,
     selectedRarities,
     selectedReleases,
@@ -230,6 +244,7 @@ export function CardCatalog({
     selectedRarities.length +
     selectedReleases.length +
     selectedKeywords.length +
+    selectedEffectProcesses.length +
     Number(levelMin !== 0 || levelMax !== maxCardLevel) +
     Number(powerMin !== 0 || powerMax !== powerFilterCeiling);
 
@@ -241,6 +256,7 @@ export function CardCatalog({
     setSelectedRarities([]);
     setSelectedReleases([]);
     setSelectedKeywords([]);
+    setSelectedEffectProcesses([]);
     setLevelMin(0);
     setLevelMax(maxCardLevel);
     setPowerMin(0);
@@ -400,6 +416,23 @@ export function CardCatalog({
                 onClick={() =>
                   setSelectedKeywords((values) =>
                     toggleFilterValue(values, keyword),
+                  )
+                }
+              />
+            ))}
+          </CollapsibleFilterGroup>
+          <CollapsibleFilterGroup
+            label="効果・処理"
+            selectedCount={selectedEffectProcesses.length}
+          >
+            {effectProcessOptions.map((option) => (
+              <FilterPill
+                key={option.key}
+                label={option.label}
+                active={selectedEffectProcesses.includes(option.key)}
+                onClick={() =>
+                  setSelectedEffectProcesses((values) =>
+                    toggleFilterValue(values, option.key),
                   )
                 }
               />

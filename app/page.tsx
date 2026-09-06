@@ -20,6 +20,8 @@ import { DeckSimulator } from '@/components/deck-simulator';
 import { ImportDeckDialog } from '@/components/import-deck-dialog';
 import { MyDecks } from '@/components/my-decks';
 import { Button } from '@/components/ui/button';
+import { applyCardCatalogCorrections } from '@/lib/card-catalog-corrections';
+import { applyEffectProcessTags } from '@/lib/card-effect-processes';
 import { mergeImportedDecks, parseDeckImport } from '@/lib/deck-import';
 import {
   copyDeckAsDraft,
@@ -32,9 +34,12 @@ import { validateDeck, validateDeckForRegulation } from '@/lib/deck-validator';
 
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'simulator' | 'help';
 
-// Card rule text is converted into structured metadata once when the catalog
-// is built. Deck data itself continues to store only card IDs and quantities.
-const cards = [...ijindenCards, ...customCards].map(applyCardRuleMetadata);
+// Card rule text and source-data corrections are applied once while building
+// the in-memory catalog. Deck data itself continues to store only IDs/counts.
+const cards = [...ijindenCards, ...customCards]
+  .map(applyCardCatalogCorrections)
+  .map(applyCardRuleMetadata)
+  .map(applyEffectProcessTags);
 const cardsById = new Map(cards.map((card) => [card.id, card]));
 const cardIds = new Set(cardsById.keys());
 const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
