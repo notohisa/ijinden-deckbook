@@ -50,6 +50,7 @@ const stateLabels: Record<SimpleCardState, string | undefined> = {
   manaBack: 'マリョク（裏）',
   battlefield: '戦場',
   graveyard: '墓地',
+  equipped: '装備',
 };
 
 const nextStateMessages: Record<SimpleCardState, string> = {
@@ -57,7 +58,8 @@ const nextStateMessages: Record<SimpleCardState, string> = {
   mana: 'をマリョク（裏）にしました。',
   manaBack: 'を戦場にしました。',
   battlefield: 'を墓地にしました。',
-  graveyard: 'を通常表示に戻しました。',
+  graveyard: 'を装備にしました。',
+  equipped: 'を通常表示に戻しました。',
 };
 
 export function SimpleSimulator({
@@ -217,7 +219,7 @@ export function SimpleSimulator({
               </p>
             </div>
             <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-              グレーのカードは最初のタップで公開します。公開後は、通常 → マリョク → マリョク（裏） → 戦場 → 墓地 → 通常の順に切り替わります。
+              グレーのカードは最初のタップで公開します。公開後は、通常 → マリョク → マリョク（裏） → 戦場 → 墓地 → 装備 → 通常の順に切り替わります。
             </p>
             <output
               aria-live="polite"
@@ -345,6 +347,7 @@ function SimpleCardTile({
     manaBack: 'bg-[rgb(255_255_255_/_0.70)] text-[var(--ink)]',
     battlefield: 'bg-[rgb(255_220_0_/_0.45)] text-[var(--ink)]',
     graveyard: 'bg-[rgb(0_0_0_/_0.60)] text-white',
+    equipped: 'bg-[rgb(0_100_255_/_0.45)] text-white',
   };
   const name = instance.faceDown ? hiddenLabel : cardName;
 

@@ -8,7 +8,8 @@ export type SimpleCardState =
   | 'mana'
   | 'manaBack'
   | 'battlefield'
-  | 'graveyard';
+  | 'graveyard'
+  | 'equipped';
 
 export type SimpleSimulationCard = {
   instanceId: string;
@@ -28,6 +29,7 @@ const stateOrder: readonly SimpleCardState[] = [
   'manaBack',
   'battlefield',
   'graveyard',
+  'equipped',
 ];
 
 export function getNextSimpleCardState(

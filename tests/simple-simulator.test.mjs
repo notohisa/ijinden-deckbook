@@ -29,7 +29,7 @@ test('simple mode deals four hidden guardians and reveals only the first six car
   assert.equal(new Set([...state.guardians, ...state.cards].map((card) => card.instanceId)).size, source.length);
 });
 
-test('a hidden simple card reveals first, then cycles through the five visible states', () => {
+test('a hidden simple card reveals first, then cycles through the six visible states', () => {
   const initial = createSimpleSimulation(
     Array.from({ length: 12 }, (_, index) => `card-${index}`),
     6,
@@ -47,12 +47,14 @@ test('a hidden simple card reveals first, then cycles through the five visible s
   const manaBack = tapSimpleSimulationCard(mana, hidden.instanceId);
   const battlefield = tapSimpleSimulationCard(manaBack, hidden.instanceId);
   const graveyard = tapSimpleSimulationCard(battlefield, hidden.instanceId);
-  const normal = tapSimpleSimulationCard(graveyard, hidden.instanceId);
+  const equipped = tapSimpleSimulationCard(graveyard, hidden.instanceId);
+  const normal = tapSimpleSimulationCard(equipped, hidden.instanceId);
 
   assert.equal(mana.cards[6].state, 'mana');
   assert.equal(manaBack.cards[6].state, 'manaBack');
   assert.equal(battlefield.cards[6].state, 'battlefield');
   assert.equal(graveyard.cards[6].state, 'graveyard');
+  assert.equal(equipped.cards[6].state, 'equipped');
   assert.equal(normal.cards[6].state, 'normal');
 });
 
