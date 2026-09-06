@@ -467,7 +467,7 @@ export function CardCatalog({
           </div>
         </div>
       </details>
-      <div className="-mx-3 max-h-[calc(100vh-180px)] overflow-y-auto sm:mx-0">
+      <div className="-mx-3 sm:mx-0">
         <Table
           aria-label="カード選択一覧"
           className="min-w-[18rem] table-fixed text-sm"
