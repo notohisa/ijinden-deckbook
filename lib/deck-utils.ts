@@ -23,6 +23,19 @@ export const deckRowColorClasses: Record<DeckColor, string> = {
   gray: 'bg-slate-200 hover:bg-slate-300',
 };
 
+const unlimitedDeckText = 'デッキに何枚でも入れてよい';
+
+/**
+ * Adds rule metadata while the catalog is built. Existing explicit metadata is
+ * left untouched, allowing future cards to specify a numeric cap directly.
+ */
+export function applyCardRuleMetadata(card: AppCard): AppCard {
+  if (card.deckLimit !== undefined) return card;
+  return card.description.includes(unlimitedDeckText)
+    ? { ...card, deckLimit: null }
+    : card;
+}
+
 export function countCards(cardsInPile: Record<string, number>): number {
   return Object.values(cardsInPile).reduce((total, count) => total + count, 0);
 }

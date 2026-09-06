@@ -3,6 +3,7 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { customCards } from '@/app/custom-cards';
 import { ijindenCards } from '@/app/ijinden-cards';
+import { regulations } from '@/data/regulations';
 import type {
   ArchiveData,
   Deck,
@@ -25,12 +26,15 @@ import {
   countCards,
   newDeck,
   normalizedDeckName,
+  applyCardRuleMetadata,
 } from '@/lib/deck-utils';
-import { validateDeck } from '@/lib/deck-validator';
+import { validateDeck, validateDeckForRegulation } from '@/lib/deck-validator';
 
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'simulator' | 'help';
 
-const cards = [...ijindenCards, ...customCards];
+// Card rule text is converted into structured metadata once when the catalog
+// is built. Deck data itself continues to store only card IDs and quantities.
+const cards = [...ijindenCards, ...customCards].map(applyCardRuleMetadata);
 const cardsById = new Map(cards.map((card) => [card.id, card]));
 const cardIds = new Set(cardsById.keys());
 const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
@@ -94,6 +98,13 @@ export default function Home() {
   const noticeTimerRef = useRef<number | null>(null);
   const validation = useMemo(
     () => validateDeck(activeDeck, { cardsById }),
+    [activeDeck],
+  );
+  const regulationValidations = useMemo(
+    () =>
+      regulations.map((regulation) =>
+        validateDeckForRegulation(activeDeck, regulation, { cardsById }),
+      ),
     [activeDeck],
   );
   const selectedCard = selectedCardId
@@ -469,6 +480,7 @@ export default function Home() {
             cardsById={cardsById}
             cardOrder={cardOrder}
             validation={validation}
+            regulationValidations={regulationValidations}
             notice={notice}
             onSave={saveActiveDeck}
             onClear={clearActiveDeck}

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { validateDeck } from '../lib/deck-validator.ts';
+import { ijindenCards } from '../app/ijinden-cards.ts';
+import { regulations } from '../data/regulations.ts';
+import { applyCardRuleMetadata } from '../lib/deck-utils.ts';
+import {
+  validateDeck,
+  validateDeckForRegulation,
+} from '../lib/deck-validator.ts';
 
 function card(id, name, deckLimit) {
   return {
@@ -107,4 +113,179 @@ test('禁止・制限カード定義と適用開始日を考慮する', () => {
     now: new Date('2026-09-06T00:00:00.000Z'),
   });
   assert.equal(future.status, 'valid');
+});
+
+const regulationCardsById = new Map([
+  ['medici', card('medici', 'ジョバンニ＝ディ＝メディチ')],
+  ['reunion', card('reunion', 'リユニオン')],
+  ['rikyu', card('rikyu', '千利休')],
+  ['normal-one', card('normal-one', '通常カード')],
+  ['normal-two', card('normal-two', '通常カード')],
+  ['filler', card('filler', '枚数無制限の穴埋め', null)],
+]);
+
+function regulation(id) {
+  const result = regulations.find((entry) => entry.id === id);
+  assert.ok(result, id + ' が定義されていること');
+  return result;
+}
+
+function regulationValidation(main, id) {
+  return validateDeckForRegulation(deck(main), regulation(id), {
+    cardsById: regulationCardsById,
+  });
+}
+
+test('4つのレギュレーションを指定された名称と投入上限で定義する', () => {
+  assert.deepEqual(
+    regulations.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      limits: entry.cardLimits.map(({ shortName, limit }) => [shortName, limit]),
+    })),
+    [
+      {
+        id: 'sdk-2026',
+        name: '最強ダイバー決定戦2026',
+        limits: [
+          ['メディチ', 0],
+          ['リユニオン', 0],
+          ['千利休', 0],
+        ],
+      },
+      {
+        id: '002',
+        name: 'いわゆる002',
+        limits: [
+          ['メディチ', 0],
+          ['リユニオン', 0],
+        ],
+      },
+      {
+        id: 'recommended',
+        name: '推奨レギュレーション',
+        limits: [
+          ['メディチ', 2],
+          ['リユニオン', 2],
+        ],
+      },
+      {
+        id: 'unrestricted',
+        name: '封印なし',
+        limits: [
+          ['メディチ', 4],
+          ['リユニオン', 4],
+        ],
+      },
+    ],
+  );
+});
+
+test('メイン39枚では一般ルールにより全レギュレーションが不適合になる', () => {
+  for (const entry of regulations) {
+    const result = regulationValidation({ filler: 39 }, entry.id);
+    assert.equal(result.validation.status, 'incomplete');
+    assert.equal(result.valid, false);
+  }
+});
+
+test('制限対象が0枚の有効な40枚デッキは全レギュレーションに適合する', () => {
+  for (const entry of regulations) {
+    assert.equal(regulationValidation({ filler: 40 }, entry.id).valid, true);
+  }
+});
+
+test('メディチとリユニオンの枚数をレギュレーションごとに判定する', () => {
+  const cases = [
+    {
+      name: 'メディチ1枚',
+      main: { medici: 1, filler: 39 },
+      expected: [false, false, true, true],
+    },
+    {
+      name: 'メディチ2枚・リユニオン2枚',
+      main: { medici: 2, reunion: 2, filler: 36 },
+      expected: [false, false, true, true],
+    },
+    {
+      name: 'メディチ3枚',
+      main: { medici: 3, filler: 37 },
+      expected: [false, false, false, true],
+    },
+  ];
+  for (const scenario of cases) {
+    assert.deepEqual(
+      regulations.map((entry) =>
+        regulationValidation(scenario.main, entry.id).valid,
+      ),
+      scenario.expected,
+      scenario.name,
+    );
+  }
+  const medici = regulationValidation(
+    { medici: 1, filler: 39 },
+    'recommended',
+  ).cardLimits.find((entry) => entry.shortName === 'メディチ');
+  assert.equal(medici?.count, 1);
+  assert.equal(medici?.valid, true);
+});
+
+test('千利休は最強ダイバー決定戦2026だけを不適合にする', () => {
+  assert.deepEqual(
+    regulations.map((entry) =>
+      regulationValidation({ rikyu: 1, filler: 39 }, entry.id).valid,
+    ),
+    [false, true, true, true],
+  );
+});
+
+test('通常同名カード5枚の一般ルール違反は全レギュレーションに反映される', () => {
+  for (const entry of regulations) {
+    const result = regulationValidation(
+      { 'normal-one': 3, 'normal-two': 2, filler: 35 },
+      entry.id,
+    );
+    assert.equal(result.validation.status, 'invalid');
+    assert.equal(result.valid, false);
+  }
+});
+
+test('カード説明文の枚数無制限表記は構造化deckLimitへ自動反映する', () => {
+  const marked = applyCardRuleMetadata({
+    ...card('auto-free', '自動無制限'),
+    description: 'このカードはデッキに何枚でも入れてよい。',
+  });
+  assert.equal(marked.deckLimit, null);
+  const explicit = applyCardRuleMetadata({
+    ...card('explicit-limit', '明示上限', 2),
+    description: 'デッキに何枚でも入れてよい。',
+  });
+  assert.equal(explicit.deckLimit, 2);
+});
+
+test('実カードの無制限表記とレギュレーション対象名をカタログで照合する', () => {
+  const redStone = ijindenCards.find((entry) => entry.id === 'R-013');
+  assert.ok(redStone);
+  assert.equal(applyCardRuleMetadata(redStone).deckLimit, null);
+  const catalog = new Map(
+    ijindenCards.map((entry) => {
+      const cardWithRules = applyCardRuleMetadata(entry);
+      return [cardWithRules.id, cardWithRules];
+    }),
+  );
+  const unlimitedResult = validateDeck(deck({ 'R-013': 10 }), {
+    cardsById: catalog,
+  });
+  assert.ok(
+    !unlimitedResult.errors.some(
+      (issue) => issue.code === 'card-limit' && issue.cardName === 'レッドストーン',
+    ),
+  );
+  for (const cardName of [
+    'ジョバンニ＝ディ＝メディチ',
+    'リユニオン',
+    '千利休',
+  ]) {
+    assert.ok(ijindenCards.some((entry) => entry.name === cardName));
+  }
 });

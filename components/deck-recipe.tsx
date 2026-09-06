@@ -8,10 +8,12 @@ import type {
   Deck,
   DeckValidation,
   Pile,
+  RegulationValidation,
 } from '@/app/types/deck';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DeckStatusBadge } from '@/components/deck-status-badge';
+import { RegulationStatus } from '@/components/regulation-status';
 import { cardTypes, countByCardType, countCards } from '@/lib/deck-utils';
 
 const colorOptions = ['赤', '青', '緑', '黄', '紫', '無'] as const;
@@ -21,6 +23,7 @@ type Props = {
   cardsById: ReadonlyMap<string, AppCard>;
   cardOrder: ReadonlyMap<string, number>;
   validation: DeckValidation;
+  regulationValidations: readonly RegulationValidation[];
   notice: string;
   onSave: () => void;
   onClear: () => void;
@@ -37,6 +40,7 @@ export function DeckRecipe({
   cardsById,
   cardOrder,
   validation,
+  regulationValidations,
   notice,
   onSave,
   onClear,
@@ -104,6 +108,7 @@ export function DeckRecipe({
           </div>
         </div>
         <RuleCheck validation={validation} />
+        <RegulationStatus validations={regulationValidations} />
         <div className="mt-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] font-medium tracking-wide text-[var(--muted)]">

@@ -5,10 +5,14 @@ import type {
   DeckRuleIssue,
   DeckValidation,
   DeckValidationStatus,
+  Regulation,
+  RegulationValidation,
 } from '@/app/types/deck';
+import { deckRules } from '../data/deck-rules.ts';
 import { countCards } from './deck-utils.ts';
 
-export const DEFAULT_CARD_DECK_LIMIT = 4;
+/** Kept as a named export for callers that used the previous validator API. */
+export const DEFAULT_CARD_DECK_LIMIT = deckRules.defaultSameNameLimit;
 
 // Add a card name and its deck limit here when a card needs a rule that differs from its card data.
 // `null` means no same-name limit. A card object's optional `deckLimit` has the same meaning.
@@ -17,7 +21,7 @@ export const cardDeckLimits: Readonly<Record<string, number | null>> = {};
 // Add official prohibited or restricted cards here. A limit of 0 means prohibited.
 export const cardRestrictions: readonly CardRestriction[] = [];
 
-type ValidateDeckOptions = {
+export type ValidateDeckOptions = {
   cardsById: ReadonlyMap<string, AppCard>;
   restrictions?: readonly CardRestriction[];
   cardLimits?: Readonly<Record<string, number | null>>;
@@ -94,33 +98,42 @@ export function validateDeck(
   const restrictions = options.restrictions ?? cardRestrictions;
   const configuredLimits = options.cardLimits ?? cardDeckLimits;
 
-  if (mainCount < 40) {
+  if (mainCount < deckRules.mainDeckMinimum) {
     warnings.push({
       code: 'main-minimum',
       title: 'メインデッキ',
-      detail: 'あと' + String(40 - mainCount) + '枚必要です',
+      detail:
+        'あと' + String(deckRules.mainDeckMinimum - mainCount) + '枚必要です',
       count: mainCount,
-      limit: 40,
+      limit: deckRules.mainDeckMinimum,
     });
   }
 
-  if (sideCount > 10) {
+  if (sideCount > deckRules.sideDeckMaximum) {
     errors.push({
       code: 'side-maximum',
       title: 'サイドデッキ',
-      detail: String(sideCount) + '枚 / 最大10枚',
+      detail:
+        String(sideCount) +
+        '枚 / 最大' +
+        String(deckRules.sideDeckMaximum) +
+        '枚',
       count: sideCount,
-      limit: 10,
+      limit: deckRules.sideDeckMaximum,
     });
   }
 
-  if (sideCount > 0 && totalCount > 60) {
+  if (sideCount > 0 && totalCount > deckRules.totalDeckMaximum) {
     errors.push({
       code: 'total-maximum',
       title: 'メイン＋サイド',
-      detail: String(totalCount) + '枚 / 最大60枚',
+      detail:
+        String(totalCount) +
+        '枚 / 最大' +
+        String(deckRules.totalDeckMaximum) +
+        '枚',
       count: totalCount,
-      limit: 60,
+      limit: deckRules.totalDeckMaximum,
     });
   }
 
@@ -178,5 +191,44 @@ export function validateDeck(
     sideCount,
     totalCount,
     namedCardCounts,
+  };
+}
+
+/**
+ * Validates a deck under one regulation. Regulation limits are supplied to
+ * the shared validator, so they override a card's own deckLimit while all
+ * general deck rules continue to apply.
+ */
+export function validateDeckForRegulation(
+  deck: Deck,
+  regulation: Regulation,
+  options: ValidateDeckOptions,
+): RegulationValidation {
+  const regulationLimits: Record<string, number | null> = {};
+  for (const cardLimit of regulation.cardLimits) {
+    regulationLimits[cardLimit.cardName] = cardLimit.limit;
+  }
+
+  const validation = validateDeck(deck, {
+    ...options,
+    cardLimits: {
+      ...(options.cardLimits ?? cardDeckLimits),
+      ...regulationLimits,
+    },
+  });
+
+  return {
+    regulationId: regulation.id,
+    regulationName: regulation.name,
+    valid: validation.status === 'valid',
+    validation,
+    cardLimits: regulation.cardLimits.map((cardLimit) => {
+      const count = validation.namedCardCounts.get(cardLimit.cardName) ?? 0;
+      return {
+        ...cardLimit,
+        count,
+        valid: count <= cardLimit.limit,
+      };
+    }),
   };
 }

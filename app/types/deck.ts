@@ -47,6 +47,18 @@ export type CardRestriction = {
   note?: string;
 };
 
+export type RegulationCardLimit = {
+  cardName: string;
+  shortName: string;
+  limit: number;
+};
+
+export type Regulation = {
+  id: string;
+  name: string;
+  cardLimits: readonly RegulationCardLimit[];
+};
+
 export type DeckRuleIssue = {
   code:
     | 'main-minimum'
@@ -72,6 +84,22 @@ export type DeckValidation = {
   sideCount: number;
   totalCount: number;
   namedCardCounts: ReadonlyMap<string, number>;
+};
+
+export type RegulationValidation = {
+  regulationId: string;
+  regulationName: string;
+  /** `true` only when both general rules and this regulation pass. */
+  valid: boolean;
+  /** The complete validation result under this regulation's card limits. */
+  validation: DeckValidation;
+  cardLimits: readonly {
+    cardName: string;
+    shortName: string;
+    limit: number;
+    count: number;
+    valid: boolean;
+  }[];
 };
 
 export type DeckImportError = {
