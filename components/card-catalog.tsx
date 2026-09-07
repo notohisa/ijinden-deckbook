@@ -88,7 +88,6 @@ export function CardCatalog({
   onSelectCard,
 }: Props) {
   const [query, setQuery] = useState('');
-  const [queryDraft, setQueryDraft] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<CardType[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
@@ -119,6 +118,7 @@ export function CardCatalog({
   const [powerMax, setPowerMax] = useState(powerFilterCeiling);
   const [sortBy, setSortBy] = useState<SortBy>('official');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const isComposingQueryRef = useRef(false);
   const releaseOptions = useMemo(
     () => Array.from(new Set(cards.map((card) => card.release))),
@@ -250,7 +250,9 @@ export function CardCatalog({
 
   function resetCardSearch() {
     setQuery('');
-    setQueryDraft('');
+    if (searchInputRef.current) {
+      searchInputRef.current.value = '';
+    }
     setSelectedTypes([]);
     setSelectedColors([]);
     setSelectedRarities([]);
@@ -292,22 +294,20 @@ export function CardCatalog({
           ⌕
         </span>
         <input
+          ref={searchInputRef}
           type="text"
           enterKeyHint="search"
-          value={queryDraft}
           onCompositionStart={() => {
             isComposingQueryRef.current = true;
           }}
           onCompositionEnd={(event) => {
             isComposingQueryRef.current = false;
-            const value = event.currentTarget.value;
-            setQueryDraft(value);
-            setQuery(value);
+            setQuery(event.currentTarget.value);
           }}
-          onChange={(event) => {
-            const value = event.currentTarget.value;
-            setQueryDraft(value);
-            if (!isComposingQueryRef.current) setQuery(value);
+          onInput={(event) => {
+            if (!isComposingQueryRef.current) {
+              setQuery(event.currentTarget.value);
+            }
           }}
           placeholder="名前・能力文・特性・カード番号で検索"
           className="h-10 w-full rounded-lg border border-[var(--line)] bg-white py-1 pr-2 pl-9 text-base outline-none placeholder:text-[var(--muted)] focus-visible:border-[var(--ring)] focus-visible:ring-3 focus-visible:ring-[var(--ring)]/50 md:text-sm"
