@@ -1,6 +1,12 @@
 'use client';
 
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { AppCard, CardType, Deck, Pile } from '@/app/types/deck';
 import { Button } from '@/components/ui/button';
 import {
@@ -88,6 +94,7 @@ export function CardCatalog({
   onSelectCard,
 }: Props) {
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [selectedTypes, setSelectedTypes] = useState<CardType[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
@@ -138,7 +145,7 @@ export function CardCatalog({
     [cards],
   );
   const matchingCards = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase('ja');
+    const normalized = deferredQuery.trim().toLocaleLowerCase('ja');
     const filtered = cards.filter((card) => {
       const allText = (
         card.name +
@@ -228,7 +235,7 @@ export function CardCatalog({
     levelMin,
     powerMax,
     powerMin,
-    query,
+    deferredQuery,
     selectedColors,
     selectedEffectProcesses,
     selectedKeywords,
@@ -293,10 +300,17 @@ export function CardCatalog({
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
           ⌕
         </span>
+        <label htmlFor="card-search" className="sr-only">
+          カードを検索
+        </label>
         <input
           ref={searchInputRef}
+          id="card-search"
+          name="card-search"
           type="text"
-          enterKeyHint="search"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
           onCompositionStart={() => {
             isComposingQueryRef.current = true;
           }}
@@ -304,7 +318,7 @@ export function CardCatalog({
             isComposingQueryRef.current = false;
             setQuery(event.currentTarget.value);
           }}
-          onInput={(event) => {
+          onChange={(event) => {
             if (!isComposingQueryRef.current) {
               setQuery(event.currentTarget.value);
             }
