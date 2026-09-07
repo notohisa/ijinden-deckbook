@@ -292,8 +292,8 @@ export function CardCatalog({
           ⌕
         </span>
         <input
-          type="search"
-          inputMode="search"
+          type="text"
+          enterKeyHint="search"
           value={queryDraft}
           onCompositionStart={() => {
             isComposingQueryRef.current = true;

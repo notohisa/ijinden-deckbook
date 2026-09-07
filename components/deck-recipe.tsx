@@ -2,6 +2,7 @@
 
 /* oxlint-disable next/no-img-element -- GitHub Pages renders official card URLs with standard images, without a Next.js image server. */
 
+import { useEffect, useState } from 'react';
 import type {
   AppCard,
   CardType,
@@ -17,6 +18,10 @@ import { RegulationStatus } from '@/components/regulation-status';
 import { cardTypes, countByCardType, countCards } from '@/lib/deck-utils';
 
 const colorOptions = ['赤', '青', '緑', '黄', '紫', '無'] as const;
+
+function getCardSelectionKey(pile: Pile, cardId: string): string {
+  return pile + ':' + cardId;
+}
 
 type Props = {
   deck: Deck;
@@ -51,8 +56,40 @@ export function DeckRecipe({
   onOpenCards,
   onOpenSimulator,
 }: Props) {
+  const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
   const mainTypeCounts = countByCardType(deck.main, cardsById);
   const sideTypeCounts = countByCardType(deck.side, cardsById);
+
+  function handleAdjustCard(cardId: string, pile: Pile, difference: number) {
+    if (difference < 0 && deck[pile][cardId] === 1) {
+      setSelectedCardKey(null);
+    }
+    onAdjustCard(cardId, pile, difference);
+  }
+
+  function handleMoveCard(cardId: string, pile: Pile) {
+    setSelectedCardKey(null);
+    onMoveCard(cardId, pile);
+  }
+
+  useEffect(() => {
+    if (!selectedCardKey) return;
+
+    function dismissCardControls(event: PointerEvent) {
+      const cardElement =
+        event.target instanceof Element
+          ? event.target.closest<HTMLElement>('[data-deck-card-key]')
+          : null;
+      if (cardElement?.dataset.deckCardKey !== selectedCardKey) {
+        setSelectedCardKey(null);
+      }
+    }
+
+    document.addEventListener('pointerdown', dismissCardControls);
+    return () =>
+      document.removeEventListener('pointerdown', dismissCardControls);
+  }, [selectedCardKey]);
+
   return (
     <section
       className="mx-auto min-w-0 max-w-4xl rounded-2xl border border-[var(--line)] bg-white/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]"
@@ -162,9 +199,11 @@ export function DeckRecipe({
           deck={deck}
           cardsById={cardsById}
           cardOrder={cardOrder}
-          onAdjust={onAdjustCard}
-          onMoveCard={onMoveCard}
+          onAdjust={handleAdjustCard}
+          onMoveCard={handleMoveCard}
           onSelectCard={onSelectCard}
+          selectedCardKey={selectedCardKey}
+          onSelectCardForControls={setSelectedCardKey}
         />
         <DeckPile
           title="サイドデッキ"
@@ -172,9 +211,11 @@ export function DeckRecipe({
           deck={deck}
           cardsById={cardsById}
           cardOrder={cardOrder}
-          onAdjust={onAdjustCard}
-          onMoveCard={onMoveCard}
+          onAdjust={handleAdjustCard}
+          onMoveCard={handleMoveCard}
           onSelectCard={onSelectCard}
+          selectedCardKey={selectedCardKey}
+          onSelectCardForControls={setSelectedCardKey}
         />
       </div>
       <div className="border-t border-[var(--line)] bg-[var(--soft)] px-4 py-3 sm:px-5">
@@ -266,6 +307,8 @@ function DeckPile({
   onAdjust,
   onMoveCard,
   onSelectCard,
+  selectedCardKey,
+  onSelectCardForControls,
 }: {
   title: string;
   pile: Pile;
@@ -275,6 +318,8 @@ function DeckPile({
   onAdjust: (cardId: string, pile: Pile, difference: number) => void;
   onMoveCard: (cardId: string, pile: Pile) => void;
   onSelectCard: (cardId: string) => void;
+  selectedCardKey: string | null;
+  onSelectCardForControls: (key: string) => void;
 }) {
   const entries = Object.entries(deck[pile])
     .map(([cardId, count]) => ({ card: cardsById.get(cardId), count }))
@@ -309,72 +354,85 @@ function DeckPile({
           className="flex flex-wrap gap-2"
           aria-label={title + 'のカード一覧'}
         >
-          {entries.map(({ card, count }) => (
-            <li
-              key={card.id}
-              className="relative h-[112px] w-[80px] overflow-hidden rounded-md border border-black/15 bg-white shadow-sm"
-            >
-              <button
-                type="button"
-                onClick={() => onSelectCard(card.id)}
-                aria-label={card.name + 'の詳細を開く'}
-                className="absolute inset-0 z-0"
+          {entries.map(({ card, count }) => {
+            const cardSelectionKey = getCardSelectionKey(pile, card.id);
+            const controlsVisible = selectedCardKey === cardSelectionKey;
+
+            return (
+              <li
+                key={card.id}
+                data-deck-card-key={cardSelectionKey}
+                className="relative h-[112px] w-[80px] overflow-hidden rounded-md border border-black/15 bg-white shadow-sm"
               >
-                <img
-                  src={card.imageUrl}
-                  alt={card.name}
-                  loading="lazy"
-                  className="h-full w-full object-cover object-top"
-                />
-              </button>
-              <Button
-                type="button"
-                size="icon-xs"
-                onClick={() => onAdjust(card.id, pile, -1)}
-                aria-label={card.name + 'を1枚減らす'}
-                className="absolute left-0 top-0 z-20 rounded-none rounded-br-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]"
-              >
-                −
-              </Button>
-              <Button
-                type="button"
-                size="icon-xs"
-                onClick={() => onAdjust(card.id, pile, 1)}
-                aria-label={card.name + 'を1枚増やす'}
-                className="absolute right-0 top-0 z-20 rounded-none rounded-bl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]"
-              >
-                ＋
-              </Button>
-              <button
-                type="button"
-                onClick={() => onSelectCard(card.id)}
-                aria-label={card.name + 'の詳細を開く'}
-                className="absolute left-1/2 top-1/2 z-20 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-md border border-white/80 bg-white/95 text-base text-[var(--ink)] shadow-sm hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
-              >
-                ⌕
-              </button>
-              <output
-                aria-label={card.name + '：' + count + '枚'}
-                className="absolute bottom-0 left-0 min-w-6 rounded-tr-md border-r border-t border-black/30 bg-white px-1.5 py-0.5 text-center font-display text-sm leading-none text-[var(--ink)]"
-              >
-                {count}
-              </output>
-              <Button
-                type="button"
-                size="icon-xs"
-                onClick={() => onMoveCard(card.id, pile)}
-                aria-label={
-                  card.name +
-                  'を' +
-                  (pile === 'main' ? 'サイドデッキ' : 'メインデッキ') +
-                  'へ1枚移動'
-                }
-                className="absolute bottom-0 right-0 z-20 rounded-none rounded-tl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]"
-              >
-                {pile === 'main' ? '↓' : '↑'}
-              </Button>
-            </li>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => onSelectCardForControls(cardSelectionKey)}
+                  aria-label={card.name + 'の操作を表示'}
+                  aria-expanded={controlsVisible}
+                  className="absolute inset-0 z-0"
+                >
+                  <img
+                    src={card.imageUrl}
+                    alt={card.name}
+                    loading="lazy"
+                    className="h-full w-full object-cover object-top"
+                  />
+                </button>
+                {controlsVisible && (
+                  <>
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      onClick={() => onAdjust(card.id, pile, -1)}
+                      aria-label={card.name + 'を1枚減らす'}
+                      className="absolute left-0 top-0 z-20 rounded-none rounded-br-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]"
+                    >
+                      −
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      onClick={() => onAdjust(card.id, pile, 1)}
+                      aria-label={card.name + 'を1枚増やす'}
+                      className="absolute right-0 top-0 z-20 rounded-none rounded-bl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]"
+                    >
+                      ＋
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => onSelectCard(card.id)}
+                      aria-label={card.name + 'の詳細を開く'}
+                      className="absolute left-1/2 top-1/2 z-20 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-md border border-white/80 bg-white/95 text-base text-[var(--ink)] shadow-sm hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
+                    >
+                      ⌕
+                    </button>
+                  </>
+                )}
+                <output
+                  aria-label={card.name + '：' + count + '枚'}
+                  className="absolute bottom-0 left-0 min-w-6 rounded-tr-md border-r border-t border-black/30 bg-white px-1.5 py-0.5 text-center font-display text-sm leading-none text-[var(--ink)]"
+                >
+                  {count}
+                </output>
+                {controlsVisible && (
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    onClick={() => onMoveCard(card.id, pile)}
+                    aria-label={
+                      card.name +
+                      'を' +
+                      (pile === 'main' ? 'サイドデッキ' : 'メインデッキ') +
+                      'へ1枚移動'
+                    }
+                    className="absolute bottom-0 right-0 z-20 rounded-none rounded-tl-md bg-[#1769db] text-base text-white hover:bg-[#0f56b7]"
+                  >
+                    {pile === 'main' ? '↓' : '↑'}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
