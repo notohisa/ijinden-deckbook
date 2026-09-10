@@ -9,7 +9,6 @@ import type {
   Deck,
   DeckColor,
   DeckImportParseResult,
-  LegacyArchiveData,
   MyDeckExport,
   Pile,
 } from '@/app/types/deck';
@@ -23,6 +22,12 @@ import { Button } from '@/components/ui/button';
 import { applyCardCatalogCorrections } from '@/lib/card-catalog-corrections';
 import { applyEffectProcessTags } from '@/lib/card-effect-processes';
 import { mergeImportedDecks, parseDeckImport } from '@/lib/deck-import';
+import {
+  type ArchiveLoadResult,
+  loadStoredArchive,
+  localStorageKey,
+  saveStoredArchive,
+} from '@/lib/deck-storage';
 import {
   copyDeckAsDraft,
   countCards,
@@ -51,48 +56,15 @@ const initialDeck: Deck = {
   updatedAt: new Date().toISOString(),
   isSaved: false,
 };
-const localStorageKey = 'ijinden-deckbook-v1';
-
-function isPile(value: unknown): value is Record<string, number> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  return Object.values(value as Record<string, unknown>).every(
-    (count) =>
-      typeof count === 'number' && Number.isSafeInteger(count) && count > 0,
-  );
-}
-
-function isStoredDeck(value: unknown): value is Deck {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const deck = value as Partial<Deck>;
-  return (
-    typeof deck.id === 'string' &&
-    typeof deck.name === 'string' &&
-    typeof deck.updatedAt === 'string' &&
-    isPile(deck.main) &&
-    isPile(deck.side)
-  );
-}
-
-function cloneStoredDeck(deck: Deck, isSaved = deck.isSaved): Deck {
-  const color =
-    deck.color === 'default' || deck.color === 'orange' || deck.color === 'gray'
-      ? deck.color
-      : undefined;
-  return {
-    ...deck,
-    main: { ...deck.main },
-    side: { ...deck.side },
-    isSaved,
-    ...(color ? { color } : {}),
-  };
-}
 
 export default function Home() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [activeDeck, setActiveDeck] = useState<Deck>(initialDeck);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
-  const [localDataReady, setLocalDataReady] = useState(false);
+  const [archiveLoad, setArchiveLoad] = useState<ArchiveLoadResult | null>(
+    null,
+  );
   const [notice, setNotice] = useState(
     'カードを追加して、あなたの最初のデッキを作りましょう。',
   );
@@ -146,55 +118,32 @@ export default function Home() {
 
   /* oxlint-disable react/react-compiler -- Browser localStorage is an external persistence system; hydration and failed-write notices intentionally update state from this synchronization. */
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(localStorageKey);
-      if (!saved) return;
-      const savedArchive = JSON.parse(saved) as
-        | Partial<ArchiveData>
-        | Partial<LegacyArchiveData>;
-      if (
-        savedArchive.version === 2 &&
-        Array.isArray(savedArchive.decks) &&
-        isStoredDeck(savedArchive.draft)
-      ) {
-        setDecks(
-          savedArchive.decks
-            .filter(isStoredDeck)
-            .map((deck) => cloneStoredDeck(deck, true)),
-        );
-        setActiveDeck(cloneStoredDeck(savedArchive.draft, false));
+    const result = loadStoredArchive(() =>
+      window.localStorage.getItem(localStorageKey),
+    );
+    if (result.status === 'ready') {
+      setDecks(result.decks);
+      if (result.draft) setActiveDeck(result.draft);
+      if (result.source === 'v2') {
         showNotice('保存済みデッキと作業中のレシピを読み込みました。');
-      } else if (
-        savedArchive.version === 1 &&
-        Array.isArray(savedArchive.decks)
-      ) {
-        const legacyDecks = savedArchive.decks.filter(isStoredDeck);
-        const legacyDraft = legacyDecks.find((deck) => !deck.isSaved);
-        setDecks(
-          legacyDecks
-            .filter((deck) => deck.isSaved)
-            .map((deck) => cloneStoredDeck(deck, true)),
-        );
-        if (legacyDraft) setActiveDeck(copyDeckAsDraft(legacyDraft));
+      } else if (result.source === 'v1') {
         showNotice('保存済みデッキを読み込みました。');
       }
-    } catch {
-      showNotice('この端末の保存データを読み込めませんでした。');
-    } finally {
-      setLocalDataReady(true);
     }
+    setArchiveLoad(result);
   }, []);
 
   useEffect(() => {
-    if (!localDataReady) return;
     try {
-      window.localStorage.setItem(localStorageKey, JSON.stringify(archive));
+      saveStoredArchive(archiveLoad, archive, (raw) =>
+        window.localStorage.setItem(localStorageKey, raw),
+      );
     } catch {
       showNotice(
         'この端末に保存できませんでした。マイデッキをエクスポートしてください。',
       );
     }
-  }, [archive, localDataReady]);
+  }, [archive, archiveLoad]);
   /* oxlint-enable react/react-compiler */
 
   function updateActiveDeck(updater: (deck: Deck) => Deck) {
@@ -345,6 +294,20 @@ export default function Home() {
     );
   }
 
+  function downloadUnreadableArchive() {
+    if (archiveLoad?.status !== 'blocked' || archiveLoad.raw === null) return;
+    const blob = new Blob([archiveLoad.raw], {
+      type: 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download =
+      'deckbook-recovery-' + new Date().toISOString().slice(0, 10) + '.json';
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   async function inspectImportFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -410,6 +373,7 @@ export default function Home() {
               accept="application/json,.json"
               className="sr-only"
               onChange={inspectImportFile}
+              disabled={archiveLoad?.status !== 'ready'}
             />
             <Button
               variant="outline"
@@ -417,6 +381,7 @@ export default function Home() {
               className="border-[var(--line)] bg-white/70 max-[419px]:px-1.5"
               onClick={exportMyDecks}
               aria-label="マイデッキをエクスポート"
+              disabled={archiveLoad?.status !== 'ready'}
             >
               <span className="min-[420px]:hidden">↓</span>
               <span className="hidden min-[420px]:inline">↓ エクスポート</span>
@@ -427,6 +392,7 @@ export default function Home() {
               className="border-[var(--line)] bg-white/70 max-[419px]:px-1.5"
               onClick={() => importFileInputRef.current?.click()}
               aria-label="マイデッキをインポート"
+              disabled={archiveLoad?.status !== 'ready'}
             >
               <span className="min-[420px]:hidden">↑</span>
               <span className="hidden min-[420px]:inline">↑ インポート</span>
@@ -457,6 +423,7 @@ export default function Home() {
                 role="tab"
                 aria-selected={activeTab === tab}
                 onClick={() => setActiveTab(tab)}
+                disabled={archiveLoad?.status !== 'ready'}
                 className={
                   'border-b-2 px-1 py-3 text-sm font-medium transition min-[360px]:px-2 sm:px-4 ' +
                   (activeTab === tab
@@ -471,53 +438,104 @@ export default function Home() {
         </nav>
       </header>
       <div className="mx-auto max-w-[1180px] px-4 py-5 sm:px-6">
-        {activeTab === 'cards' && (
-          <CardCatalog
-            cards={cards}
-            activeDeck={activeDeck}
-            onAdjustCard={adjustCard}
-            onSelectCard={setSelectedCardId}
-          />
+        {archiveLoad === null && (
+          <output className="block text-base text-[var(--muted)]">
+            保存データを読み込んでいます。
+          </output>
         )}
-        {activeTab === 'recipe' && (
-          <DeckRecipe
-            deck={activeDeck}
-            cardsById={cardsById}
-            cardOrder={cardOrder}
-            validation={validation}
-            regulationValidations={regulationValidations}
-            notice={notice}
-            onSave={saveActiveDeck}
-            onClear={clearActiveDeck}
-            onNameChange={(name) =>
-              updateActiveDeck((deck) => ({ ...deck, name }))
-            }
-            onAdjustCard={adjustCard}
-            onMoveCard={moveCard}
-            onSelectCard={setSelectedCardId}
-            onOpenCards={() => setActiveTab('cards')}
-            onOpenSimulator={() => setActiveTab('simulator')}
-          />
+        {archiveLoad?.status === 'blocked' && (
+          <section
+            role="alert"
+            aria-labelledby="storage-recovery-title"
+            className="mx-auto max-w-2xl space-y-4 rounded-2xl border border-[var(--red)] bg-white/80 p-5 text-base leading-7 sm:p-7"
+          >
+            <h1
+              id="storage-recovery-title"
+              className="font-display text-xl text-[var(--ink)]"
+            >
+              保存データを読み込めませんでした
+            </h1>
+            <p>
+              元のデータを上書きしないよう、自動保存とデッキの編集を停止しています。
+              保存データの削除や初期化は行っていません。
+            </p>
+            <p className="text-[var(--muted)]">
+              {archiveLoad.reason === 'read-error'
+                ? 'ブラウザの保存領域にアクセスできません。ブラウザの設定を確認してから、ページを再読み込みしてください。'
+                : archiveLoad.reason === 'unsupported-version'
+                  ? 'この保存形式には対応していません。元のデータをダウンロードして保管し、アプリの更新後に再度お試しください。'
+                  : '保存データの形式を確認できません。元のデータをダウンロードして保管し、復旧にお使いください。'}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {archiveLoad.raw !== null && (
+                <Button
+                  onClick={downloadUnreadableArchive}
+                  className="h-auto min-h-11 whitespace-normal px-4 py-2"
+                >
+                  元の保存データをダウンロード
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => window.location.reload()}
+                className="h-auto min-h-11 whitespace-normal px-4 py-2"
+              >
+                ページを再読み込み
+              </Button>
+            </div>
+          </section>
         )}
-        <DeckSimulator
-          active={activeTab === 'simulator'}
-          recipeName={activeDeck.name}
-          main={activeDeck.main}
-          cardsById={cardsById}
-          onEditRecipe={() => setActiveTab('recipe')}
-        />
-        {activeTab === 'myDecks' && (
-          <MyDecks
-            decks={decks}
-            cardsById={cardsById}
-            onCreate={createDeck}
-            onOpenDeck={openSavedDeck}
-            onRename={renameSavedDeck}
-            onSetColor={setDeckColor}
-            onDelete={deleteSavedDeck}
-          />
+        {archiveLoad?.status === 'ready' && (
+          <>
+            {activeTab === 'cards' && (
+              <CardCatalog
+                cards={cards}
+                activeDeck={activeDeck}
+                onAdjustCard={adjustCard}
+                onSelectCard={setSelectedCardId}
+              />
+            )}
+            {activeTab === 'recipe' && (
+              <DeckRecipe
+                deck={activeDeck}
+                cardsById={cardsById}
+                cardOrder={cardOrder}
+                validation={validation}
+                regulationValidations={regulationValidations}
+                notice={notice}
+                onSave={saveActiveDeck}
+                onClear={clearActiveDeck}
+                onNameChange={(name) =>
+                  updateActiveDeck((deck) => ({ ...deck, name }))
+                }
+                onAdjustCard={adjustCard}
+                onMoveCard={moveCard}
+                onSelectCard={setSelectedCardId}
+                onOpenCards={() => setActiveTab('cards')}
+                onOpenSimulator={() => setActiveTab('simulator')}
+              />
+            )}
+            <DeckSimulator
+              active={activeTab === 'simulator'}
+              recipeName={activeDeck.name}
+              main={activeDeck.main}
+              cardsById={cardsById}
+              onEditRecipe={() => setActiveTab('recipe')}
+            />
+            {activeTab === 'myDecks' && (
+              <MyDecks
+                decks={decks}
+                cardsById={cardsById}
+                onCreate={createDeck}
+                onOpenDeck={openSavedDeck}
+                onRename={renameSavedDeck}
+                onSetColor={setDeckColor}
+                onDelete={deleteSavedDeck}
+              />
+            )}
+            {activeTab === 'help' && <Help />}
+          </>
         )}
-        {activeTab === 'help' && <Help />}
       </div>
       {toast && (
         <div
