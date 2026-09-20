@@ -553,7 +553,15 @@ export function CardCatalog({
               );
               const idBackground =
                 tints.length > 1
-                  ? 'linear-gradient(135deg, ' + tints.join(', ') + ')'
+                  ? 'linear-gradient(135deg, ' +
+                    tints[0] +
+                    ' 0%, ' +
+                    tints[0] +
+                    ' 50%, ' +
+                    tints[1] +
+                    ' 50%, ' +
+                    tints[1] +
+                    ' 100%)'
                   : tints[0];
               return (
                 <TableRow
