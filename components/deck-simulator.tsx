@@ -2,7 +2,20 @@
 
 /* oxlint-disable next/no-img-element -- GitHub Pages renders official card URLs with standard images, without a Next.js image server. */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  pointerWithin,
+  useDndMonitor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type UniqueIdentifier,
+} from '@dnd-kit/core';
 import type { IjindenCard } from '@/app/ijinden-cards';
 import { SimpleSimulator } from '@/components/simple-simulator';
 import {
@@ -46,6 +59,7 @@ import {
   type SimulationCard,
   type SimulationZone,
 } from '@/lib/simulator';
+import { getSimulationMoveDestinations } from '@/lib/simulator-movement';
 import {
   buildSimulationRecipe,
   SIMULATION_GUARDIAN_SIZE,
@@ -74,6 +88,8 @@ type BoardSimulatorProps = DeckSimulatorProps & {
   mode: SimulationViewMode;
   onModeChange: (mode: SimulationViewMode) => void;
   session: SimulatorSession | null;
+  message: string;
+  onMessageChange: (message: string) => void;
   recipe: SimulationRecipe;
   onStart: () => void;
   onDraw: () => void;
@@ -87,6 +103,18 @@ type MoveDestination = {
   zone: SimulationZone;
   label: string;
 };
+
+const boardDropZones: readonly BoardZone[] = [
+  'hand',
+  'battlefield',
+  'mana',
+  'graveyard',
+  'guardians',
+];
+
+function getBoardDropZone(id: UniqueIdentifier | undefined): BoardZone | undefined {
+  return boardDropZones.find((zone) => zone === id);
+}
 
 function isSmallScreen(): boolean {
   return (
@@ -146,77 +174,27 @@ function getInitialBoardCollapseState(): BoardCollapseState {
   }
 }
 
-function isManaOrMagic(card: IjindenCard): boolean {
-  return card.cardType === 'マリョク' || card.cardType === 'マホウ';
-}
-
 function getMoveDestinations(
   instance: SimulationCard,
   card: IjindenCard,
 ): MoveDestination[] {
-  if (instance.equippedTo || instance.faceDown) return [];
-
-  switch (instance.zone) {
-    case 'hand':
-      return isManaOrMagic(card)
-        ? [
-            { zone: 'mana', label: 'マリョクへ' },
-            { zone: 'graveyard', label: '墓地へ' },
-            { zone: 'guardians', label: 'ガーディアンへ' },
-          ]
-        : [
-            { zone: 'battlefield', label: '戦場へ' },
-            { zone: 'mana', label: 'マリョクへ' },
-            { zone: 'graveyard', label: '墓地へ' },
-            { zone: 'guardians', label: 'ガーディアンへ' },
-          ];
-    case 'battlefield':
-      return [
-        { zone: 'hand', label: '手札へ' },
-        { zone: 'mana', label: 'マリョクへ' },
-        { zone: 'graveyard', label: '墓地へ' },
-        { zone: 'guardians', label: 'ガーディアンへ' },
-      ];
-    case 'mana':
-      return isManaOrMagic(card)
-        ? [
-            { zone: 'hand', label: '手札へ' },
-            { zone: 'graveyard', label: '墓地へ' },
-            { zone: 'guardians', label: 'ガーディアンへ' },
-          ]
-        : [
-            { zone: 'battlefield', label: '戦場へ' },
-            { zone: 'hand', label: '手札へ' },
-            { zone: 'graveyard', label: '墓地へ' },
-            { zone: 'guardians', label: 'ガーディアンへ' },
-          ];
-    case 'graveyard':
-      return isManaOrMagic(card)
-        ? [
-            { zone: 'hand', label: '手札へ' },
-            { zone: 'mana', label: 'マリョクへ' },
-            { zone: 'guardians', label: 'ガーディアンへ' },
-          ]
-        : [
-            { zone: 'battlefield', label: '戦場へ' },
-            { zone: 'hand', label: '手札へ' },
-            { zone: 'mana', label: 'マリョクへ' },
-            { zone: 'guardians', label: 'ガーディアンへ' },
-          ];
-    case 'guardians':
-      return [
-        { zone: 'hand', label: '手札へ' },
-        { zone: 'mana', label: 'マリョクへ' },
-        { zone: 'graveyard', label: '墓地へ' },
-      ];
-    case 'deck':
-      return [];
-  }
+  return getSimulationMoveDestinations({
+    ...instance,
+    cardType: card.cardType,
+  }).map((zone) => ({ zone, label: zoneNames[zone] + 'へ' }));
 }
 
 export function DeckSimulator(props: DeckSimulatorProps) {
   const [mode, setMode] = useState<SimulationViewMode>(getInitialViewMode);
   const [session, setSession] = useState<SimulatorSession | null>(null);
+  const [boardMessage, setBoardMessage] = useState('');
+  const [dragEpoch, setDragEpoch] = useState(0);
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 6 },
+    }),
+  );
   const recipe = useMemo(
     () => buildSimulationRecipe(props.main, props.cardsById),
     [props.main, props.cardsById],
@@ -232,6 +210,8 @@ export function DeckSimulator(props: DeckSimulatorProps) {
 
   function start() {
     if (recipe.error) return;
+    setBoardMessage('シャッフルして手札6枚・ガーディアン4枚を配りました。');
+    setDragEpoch((current) => current + 1);
     setSession({
       board: createSimulation(
         recipe.cardInputs,
@@ -281,18 +261,49 @@ export function DeckSimulator(props: DeckSimulatorProps) {
 
   return (
     <>
-      <BoardSimulator
-        {...props}
-        active={props.active && mode === 'board'}
-        mode={mode}
-        onModeChange={setMode}
-        session={session}
-        recipe={recipe}
-        onStart={start}
-        onDraw={draw}
-        onMulligan={mulligan}
-        onUpdateSession={updateSession}
-      />
+      <DndContext
+        key={`${props.active ? 'active' : 'inactive'}-${mode}-${dragEpoch}`}
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        accessibility={{
+          screenReaderInstructions: {
+            draggable:
+              'カードを移動するにはドラッグしてください。Enterまたはスペースでカードの操作メニューを開けます。',
+          },
+          announcements: {
+            onDragStart: () => 'カードをドラッグしています。',
+            onDragOver: ({ over }) => {
+              const destination = getBoardDropZone(over?.id);
+              return destination
+                ? zoneNames[destination] + 'へ移動できます。'
+                : '移動できるゾーンの上へカードを運んでください。';
+            },
+            onDragEnd: ({ over }) => {
+              const destination = getBoardDropZone(over?.id);
+              return destination
+                ? 'カードを' + zoneNames[destination] + 'へ移動しました。'
+                : 'カードの移動をキャンセルしました。';
+            },
+            onDragCancel: () => 'カードの移動をキャンセルしました。',
+          },
+        }}
+      >
+        <BoardSimulator
+          key={`${props.active ? 'active' : 'inactive'}-${mode}-${dragEpoch}`}
+          {...props}
+          active={props.active && mode === 'board'}
+          mode={mode}
+          onModeChange={setMode}
+          session={session}
+          message={boardMessage}
+          onMessageChange={setBoardMessage}
+          recipe={recipe}
+          onStart={start}
+          onDraw={draw}
+          onMulligan={mulligan}
+          onUpdateSession={updateSession}
+        />
+      </DndContext>
       <SimpleSimulator
         {...props}
         active={props.active && mode === 'simple'}
@@ -316,19 +327,25 @@ function BoardSimulator({
   mode,
   onModeChange,
   session,
+  message,
+  onMessageChange: setMessage,
   recipe,
   onStart,
   onDraw,
   onMulligan,
   onUpdateSession,
 }: BoardSimulatorProps) {
-  const [message, setMessage] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(
     null,
   );
   const [equipSourceId, setEquipSourceId] = useState<string | null>(null);
   const [detailCardId, setDetailCardId] = useState<string | null>(null);
+  const [activeDragInstanceId, setActiveDragInstanceId] = useState<string | null>(null);
+  const suppressCardTapRef = useRef(false);
+  const suppressCardTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [collapsedZones, setCollapsedZones] = useState<BoardCollapseState>(
     getInitialBoardCollapseState,
   );
@@ -376,6 +393,25 @@ function BoardSimulator({
   const battlefieldIjins = session
     ? session.board.zones.battlefield.filter(isBattlefieldIjin)
     : [];
+  const activeDragInstance =
+    session && activeDragInstanceId
+      ? findSimulationCard(session.board, activeDragInstanceId)
+      : undefined;
+  const activeDragCard = activeDragInstance
+    ? cardsById.get(activeDragInstance.cardId)
+    : undefined;
+  const dragDestinations = activeDragInstance
+    ? getSimulationMoveDestinations(activeDragInstance, {
+        allowFaceDownGuardians: true,
+      })
+    : [];
+  const {
+    isOver: battlefieldIsOver,
+    setNodeRef: setBattlefieldDropNodeRef,
+  } = useDroppable({
+    id: 'battlefield',
+    disabled: !dragDestinations.includes('battlefield'),
+  });
   const recipeChanged = Boolean(
     session && session.recipeSignature !== recipe.signature,
   );
@@ -387,7 +423,6 @@ function BoardSimulator({
     setSelectedInstanceId(null);
     setEquipSourceId(null);
     setDetailCardId(null);
-    setMessage('シャッフルして手札6枚・ガーディアン4枚を配りました。');
   }
 
   function draw() {
@@ -444,6 +479,61 @@ function BoardSimulator({
             'へ移動しました。',
     );
   }
+
+  function finishDrag() {
+    setActiveDragInstanceId(null);
+    suppressCardTapRef.current = true;
+    if (suppressCardTapTimeoutRef.current) {
+      clearTimeout(suppressCardTapTimeoutRef.current);
+    }
+    suppressCardTapTimeoutRef.current = setTimeout(() => {
+      suppressCardTapRef.current = false;
+      suppressCardTapTimeoutRef.current = null;
+    }, 100);
+  }
+
+  function selectCard(instance: SimulationCard) {
+    if (suppressCardTapRef.current) {
+      suppressCardTapRef.current = false;
+      if (suppressCardTapTimeoutRef.current) {
+        clearTimeout(suppressCardTapTimeoutRef.current);
+        suppressCardTapTimeoutRef.current = null;
+      }
+      return;
+    }
+    setSelectedInstanceId(instance.instanceId);
+  }
+
+  useDndMonitor({
+    onDragStart({ active: dragged }) {
+      const instance = session
+        ? findSimulationCard(session.board, String(dragged.id))
+        : undefined;
+      if (!instance) return;
+      setActiveDragInstanceId(instance.instanceId);
+      setSelectedInstanceId(null);
+      setEquipSourceId(null);
+    },
+    onDragEnd({ active: dragged, over }) {
+      const instance = session
+        ? findSimulationCard(session.board, String(dragged.id))
+        : undefined;
+      const destination = getBoardDropZone(over?.id);
+      if (
+        instance &&
+        destination &&
+        getSimulationMoveDestinations(instance, {
+          allowFaceDownGuardians: true,
+        }).includes(destination)
+      ) {
+        moveCard(instance, destination);
+      }
+      finishDrag();
+    },
+    onDragCancel() {
+      finishDrag();
+    },
+  });
 
   function moveTopDeckCardToGuardian() {
     if (!session || session.board.zones.deck.length === 0) return;
@@ -672,6 +762,8 @@ function BoardSimulator({
           </div>
 
           <ZonePanel
+            zone="hand"
+            dragDestinations={dragDestinations}
             title="手札"
             count={session.board.zones.hand.length}
             meta={'初手6枚 ＋ ドロー' + String(session.drawn) + '枚'}
@@ -686,14 +778,22 @@ function BoardSimulator({
                   key={instance.instanceId}
                   instance={instance}
                   card={card}
-                  onTap={() => setSelectedInstanceId(instance.instanceId)}
+                  onTap={() => selectCard(instance)}
                 />
               ) : null;
             })}
           </ZonePanel>
 
           <section
-            className="rounded-2xl border border-[var(--line)] bg-white/75 p-3 sm:p-4"
+            ref={setBattlefieldDropNodeRef}
+            className={
+              'rounded-2xl border bg-white/75 p-3 sm:p-4 ' +
+              (battlefieldIsOver
+                ? 'border-[var(--green)] ring-2 ring-[var(--green)]/30'
+                : dragDestinations.includes('battlefield')
+                  ? 'border-[var(--green)]/60'
+                  : 'border-[var(--line)]')
+            }
             aria-label="戦場"
           >
             <ZoneHeading
@@ -716,9 +816,7 @@ function BoardSimulator({
                           key={instance.instanceId}
                           instance={instance}
                           card={card}
-                          onTap={() =>
-                            setSelectedInstanceId(instance.instanceId)
-                          }
+                          onTap={() => selectCard(instance)}
                         />
                       ) : null;
                     })}
@@ -741,9 +839,7 @@ function BoardSimulator({
                           card={card}
                           equipment={equipment}
                           cardsById={cardsById}
-                          onTap={(cardInstance) =>
-                            setSelectedInstanceId(cardInstance.instanceId)
-                          }
+                          onTap={selectCard}
                         />
                       );
                     })}
@@ -760,9 +856,7 @@ function BoardSimulator({
                             key={instance.instanceId}
                             instance={instance}
                             card={card}
-                            onTap={() =>
-                              setSelectedInstanceId(instance.instanceId)
-                            }
+                            onTap={() => selectCard(instance)}
                           />
                         ) : null;
                       })}
@@ -774,6 +868,8 @@ function BoardSimulator({
           </section>
 
           <ZonePanel
+            zone="mana"
+            dragDestinations={dragDestinations}
             title="マリョク"
             count={session.board.zones.mana.length}
             emptyMessage="マリョクは空です。"
@@ -787,13 +883,15 @@ function BoardSimulator({
                   key={instance.instanceId}
                   instance={instance}
                   card={card}
-                  onTap={() => setSelectedInstanceId(instance.instanceId)}
+                  onTap={() => selectCard(instance)}
                 />
               ) : null;
             })}
           </ZonePanel>
 
           <ZonePanel
+            zone="graveyard"
+            dragDestinations={dragDestinations}
             title="墓地"
             count={session.board.zones.graveyard.length}
             emptyMessage="墓地は空です。"
@@ -807,13 +905,15 @@ function BoardSimulator({
                   key={instance.instanceId}
                   instance={instance}
                   card={card}
-                  onTap={() => setSelectedInstanceId(instance.instanceId)}
+                  onTap={() => selectCard(instance)}
                 />
               ) : null;
             })}
           </ZonePanel>
 
           <ZonePanel
+            zone="guardians"
+            dragDestinations={dragDestinations}
             title="ガーディアン"
             count={session.board.zones.guardians.length}
             emptyMessage="ガーディアンはいません。"
@@ -829,7 +929,7 @@ function BoardSimulator({
                   instance={instance}
                   card={card}
                   index={index}
-                  onTap={() => setSelectedInstanceId(instance.instanceId)}
+                  onTap={() => selectCard(instance)}
                 />
               ) : null;
             })}
@@ -838,7 +938,7 @@ function BoardSimulator({
       )}
 
       <p className="px-1 text-xs leading-6 text-[var(--muted)]">
-        カードをタップすると操作メニューを開きます。対戦相手・コスト・カード固有の細かな条件は自動処理しません。レシピやマイデッキの内容は変わりません。
+        カードをドラッグして移動できます。スマホは長押しして移動、タップでも操作メニューを開けます。対戦相手・コスト・カード固有の細かな条件は自動処理しません。レシピやマイデッキの内容は変わりません。
       </p>
 
       <AlertDialog open={active && confirmReset} onOpenChange={setConfirmReset}>
@@ -1081,6 +1181,14 @@ function BoardSimulator({
           )}
         </DialogContent>
       </Dialog>
+      <DragOverlay dropAnimation={null}>
+        {activeDragInstance && activeDragCard ? (
+          <SimulationDragPreview
+            instance={activeDragInstance}
+            card={activeDragCard}
+          />
+        ) : null}
+      </DragOverlay>
     </section>
   );
 }
@@ -1122,6 +1230,8 @@ function ZoneHeading({
 }
 
 function ZonePanel({
+  zone,
+  dragDestinations,
   title,
   count,
   meta,
@@ -1131,6 +1241,8 @@ function ZonePanel({
   onToggle,
   children,
 }: {
+  zone: BoardZone;
+  dragDestinations: SimulationZone[];
   title: string;
   count: number;
   meta?: string;
@@ -1140,6 +1252,11 @@ function ZonePanel({
   onToggle: () => void;
   children: React.ReactNode;
 }) {
+  const canDrop = dragDestinations.includes(zone);
+  const { isOver, setNodeRef } = useDroppable({
+    id: zone,
+    disabled: !canDrop,
+  });
   const childCount = Array.isArray(children)
     ? children.filter(Boolean).length
     : children
@@ -1147,7 +1264,15 @@ function ZonePanel({
       : 0;
   return (
     <section
-      className="rounded-2xl border border-[var(--line)] bg-white/75 p-3 sm:p-4"
+      ref={setNodeRef}
+      className={
+        'rounded-2xl border bg-white/75 p-3 sm:p-4 ' +
+        (isOver
+          ? 'border-[var(--green)] ring-2 ring-[var(--green)]/30'
+          : canDrop
+            ? 'border-[var(--green)]/60'
+            : 'border-[var(--line)]')
+      }
       aria-label={title}
     >
       <ZoneHeading
@@ -1254,15 +1379,27 @@ function SimulationCardTile({
   listItem?: boolean;
   onTap: () => void;
 }) {
+  const destinations = getSimulationMoveDestinations(instance, {
+    allowFaceDownGuardians: true,
+  });
+  const { attributes, isDragging, listeners, setNodeRef } = useDraggable({
+    id: instance.instanceId,
+    disabled: destinations.length === 0,
+  });
   const name = instance.faceDown
     ? '裏向きのガーディアン' + (index === undefined ? '' : String(index + 1))
     : card.name;
   const imageClass = instance.isGrayedOut ? 'grayscale opacity-60' : '';
   const cardTile = (
-    <div className="w-[80px] min-w-0 shrink-0">
+    <div className="w-[80px] min-w-0 shrink-0 select-none">
       <button
+        ref={setNodeRef}
         type="button"
+        draggable={false}
+        {...attributes}
+        {...listeners}
         onClick={onTap}
+        onContextMenu={(event) => event.preventDefault()}
         aria-label={
           name +
           (instance.faceDown
@@ -1273,6 +1410,7 @@ function SimulationCardTile({
         }
         className={
           'relative block h-[112px] w-[80px] touch-manipulation overflow-hidden rounded-md border border-[var(--line)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)] ' +
+          (isDragging ? 'opacity-30 ' : '') +
           imageClass
         }
       >
@@ -1289,6 +1427,7 @@ function SimulationCardTile({
             src={card.imageUrl}
             alt={card.name}
             loading="lazy"
+            draggable={false}
             className="h-full w-full object-cover object-top"
           />
         )}
@@ -1305,4 +1444,33 @@ function SimulationCardTile({
   );
 
   return listItem ? <li>{cardTile}</li> : cardTile;
+}
+
+function SimulationDragPreview({
+  instance,
+  card,
+}: {
+  instance: SimulationCard;
+  card: IjindenCard;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none h-[112px] w-[80px] overflow-hidden rounded-md border border-[var(--line)] bg-white shadow-xl"
+    >
+      {instance.faceDown ? (
+        <span className="grid h-full place-content-center gap-1 bg-[var(--ink)] px-1 text-xs leading-5 text-[var(--paper)]">
+          <span className="text-center text-xl">◆</span>
+          <span>裏向き</span>
+        </span>
+      ) : (
+        <img
+          src={card.imageUrl}
+          alt=""
+          draggable={false}
+          className="h-full w-full object-cover object-top"
+        />
+      )}
+    </div>
+  );
 }
