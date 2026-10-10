@@ -487,14 +487,15 @@ export default function Home() {
         )}
         {archiveLoad?.status === 'ready' && (
           <>
-            {activeTab === 'cards' && (
+            {/* Keep search inputs, filters, and sorting mounted across tabs. */}
+            <div hidden={activeTab !== 'cards'}>
               <CardCatalog
                 cards={cards}
                 activeDeck={activeDeck}
                 onAdjustCard={adjustCard}
                 onSelectCard={setSelectedCardId}
               />
-            )}
+            </div>
             {activeTab === 'recipe' && (
               <DeckRecipe
                 deck={activeDeck}

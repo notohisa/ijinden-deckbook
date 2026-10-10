@@ -195,6 +195,82 @@ test('moves a card between zones and resets its gray state', () => {
   assert.equal(inGraveyard.zones.graveyard[0].zone, 'graveyard');
 });
 
+test('moves cards from every movable zone to guardians face-down and resets state', () => {
+  let state = createSimulation(
+    [
+      seed('initial-guardian'),
+      seed('from-hand'),
+      seed('from-battlefield'),
+      seed('from-mana'),
+      seed('from-graveyard'),
+      seed('from-deck'),
+    ],
+    4,
+    1,
+    preserveOrderRandom,
+  );
+  const [fromHand, fromBattlefield, fromMana, fromGraveyard] = state.zones.hand;
+  const fromDeck = state.zones.deck[0];
+  assert.ok(fromDeck);
+
+  state = moveSimulationCard(state, fromBattlefield.instanceId, 'battlefield');
+  state = moveSimulationCard(state, fromMana.instanceId, 'mana');
+  state = moveSimulationCard(state, fromGraveyard.instanceId, 'graveyard');
+  for (const card of [
+    fromHand,
+    fromBattlefield,
+    fromMana,
+    fromGraveyard,
+    fromDeck,
+  ]) {
+    state = toggleSimulationCardGrayedOut(state, card.instanceId);
+  }
+
+  const before = structuredClone(state);
+  for (const card of [
+    fromHand,
+    fromBattlefield,
+    fromMana,
+    fromGraveyard,
+    fromDeck,
+  ]) {
+    state = moveSimulationCard(state, card.instanceId, 'guardians');
+    const moved = findSimulationCard(state, card.instanceId);
+    assert.equal(moved.zone, 'guardians');
+    assert.equal(moved.faceDown, true);
+    assert.equal(moved.isGrayedOut, false);
+    assert.equal(moved.equippedTo, undefined);
+    assert.equal(moved.equipOriginZone, undefined);
+  }
+
+  assert.equal(before.zones.guardians.length, 1);
+  assert.equal(state.zones.guardians.length, 6);
+  assert.deepEqual(state.zones.deck, []);
+  assert.equal(before.zones.hand.length, 1);
+});
+
+test('moving an equipped Ijin to guardians hides it and returns attachments to their origin', () => {
+  let state = createSimulation(
+    [seed('ijin'), seed('equipment', 'ハイケイ', '装備：効果')],
+    2,
+    0,
+    preserveOrderRandom,
+  );
+  const [ijin, equipment] = state.zones.hand;
+  state = moveSimulationCard(state, ijin.instanceId, 'battlefield');
+  state = moveSimulationCard(state, equipment.instanceId, 'battlefield');
+  state = equipSimulationCard(state, equipment.instanceId, ijin.instanceId);
+
+  const moved = moveSimulationCard(state, ijin.instanceId, 'guardians');
+  const guardian = findSimulationCard(moved, ijin.instanceId);
+  const releasedEquipment = findSimulationCard(moved, equipment.instanceId);
+  assert.equal(guardian.zone, 'guardians');
+  assert.equal(guardian.faceDown, true);
+  assert.equal(releasedEquipment.zone, 'battlefield');
+  assert.equal(releasedEquipment.equippedTo, undefined);
+  assert.equal(releasedEquipment.equipOriginZone, undefined);
+});
+
 test('limits normal equipment to battlefield and mana, and grave equipment to graveyard', () => {
   const normal = seed('normal-equip', 'ハイケイ', '装備：効果');
   const grave = seed('grave-equip', 'マホウ', '冥装：効果');

@@ -23,12 +23,12 @@ import {
   getNextSimpleCardState,
   type SimpleCardState,
 } from '@/lib/simple-simulator';
-import {
-  SIMULATION_HAND_SIZE,
-  type SimulationRecipe,
-} from '@/lib/simulator-recipe';
+import type { SimulationRecipe } from '@/lib/simulator-recipe';
 import {
   flipSimulationCard,
+  findSimulationCard,
+  isBattlefieldIjin,
+  moveSimulationCard,
   type SimulationCard,
 } from '@/lib/simulator';
 
@@ -105,7 +105,6 @@ export function SimpleSimulator({
   }
 
   function tapCard(instance: SimulationCard) {
-    const card = cardsById.get(instance.cardId);
     if (instance.faceDown) {
       onUpdateSession((current) => ({
         ...current,
@@ -116,9 +115,10 @@ export function SimpleSimulator({
           [instance.instanceId]: 'normal',
         },
       }));
-      setMessage((card?.name ?? 'カード') + 'を公開しました。');
+      setMessage('カードを公開しました。');
       return;
     }
+    const card = cardsById.get(instance.cardId);
     const currentState = session?.simpleStates[instance.instanceId] ?? 'normal';
     onUpdateSession((current) => ({
       ...current,
@@ -132,6 +132,33 @@ export function SimpleSimulator({
       (card?.name ?? 'カード') +
         nextStateMessages[currentState],
     );
+  }
+
+  function makeGuardian(instance: SimulationCard) {
+    onUpdateSession((current) => {
+      const card = findSimulationCard(current.board, instance.instanceId);
+      if (!card || card.zone === 'guardians') return current;
+      const simpleStates = { ...current.simpleStates };
+      delete simpleStates[instance.instanceId];
+      if (isBattlefieldIjin(card)) {
+        for (const attachedCard of current.board.zones.battlefield) {
+          if (attachedCard.equippedTo === instance.instanceId) {
+            delete simpleStates[attachedCard.instanceId];
+          }
+        }
+      }
+      return {
+        ...current,
+        board: moveSimulationCard(
+          current.board,
+          instance.instanceId,
+          'guardians',
+        ),
+        canMulligan: false,
+        simpleStates,
+      };
+    });
+    setMessage('カードを裏向きのガーディアンにしました。');
   }
 
   return (
@@ -153,7 +180,7 @@ export function SimpleSimulator({
         </div>
         {!session && (
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            グレーのカードをめくり、公開済みカードは色で状態を記録する簡易表示です。サイドデッキは使いません。
+            グレーのカードをめくり、公開済みカードは色で状態を記録する簡易表示です。各カードをガーディアンへ移すこともできます。サイドデッキは使いません。
           </p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -193,7 +220,7 @@ export function SimpleSimulator({
         )}
         {!session && (
           <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-            初期手札6枚だけを公開して開始します。ガーディアン4枚と残りのカードは、タップすると1枚ずつ公開されます。
+            初期手札6枚だけを公開して開始します。ガーディアン4枚と残りのカードは、タップすると1枚ずつ公開されます。カード下のボタンで裏向きのガーディアンにできます。
           </p>
         )}
       </div>
@@ -214,7 +241,12 @@ export function SimpleSimulator({
               <p className="ml-auto py-1 text-sm tabular-nums">
                 手札 {session.board.zones.hand.length}枚
                 <span className="ml-2 text-[var(--muted)]">
-                  残り {Math.max(0, simpleCards.length - SIMULATION_HAND_SIZE)}枚
+                  手札以外{' '}
+                  {Math.max(
+                    0,
+                    simpleCards.length - session.board.zones.hand.length,
+                  )}
+                  枚
                 </span>
               </p>
             </div>
@@ -233,7 +265,7 @@ export function SimpleSimulator({
             title="ガーディアン"
             count={session.board.zones.guardians.length}
           >
-            <ul className="mt-3 grid max-w-md grid-cols-4 gap-2">
+            <ul className="mt-3 flex max-w-md flex-wrap items-start gap-2">
               {session.board.zones.guardians.map((instance, index) => {
                 const card = cardsById.get(instance.cardId);
                 return card ? (
@@ -252,7 +284,7 @@ export function SimpleSimulator({
           </SimpleZone>
 
           <SimpleZone title="手札・残りのカード" count={simpleCards.length}>
-            <ul className="mt-3 grid grid-cols-3 gap-2 min-[420px]:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+            <ul className="mt-3 flex flex-wrap items-start gap-2">
               {simpleCards.map((instance, index) => {
                 const card = cardsById.get(instance.cardId);
                 return card ? (
@@ -264,6 +296,7 @@ export function SimpleSimulator({
                     imageUrl={card.imageUrl}
                     hiddenLabel={'未公開カード' + String(index + 1)}
                     onTap={() => tapCard(instance)}
+                    onMakeGuardian={() => makeGuardian(instance)}
                   />
                 ) : null;
               })}
@@ -273,7 +306,7 @@ export function SimpleSimulator({
       )}
 
       <p className="px-1 text-xs leading-6 text-[var(--muted)]">
-        簡易表示では、カードの実際の移動や装備処理は行いません。盤面を細かく管理したい場合は「盤面表示」へ切り替えてください。
+        簡易表示では、ガーディアンへの移動以外のカード移動や装備処理は行いません。盤面を細かく管理したい場合は「盤面表示」へ切り替えてください。
       </p>
 
       <AlertDialog open={active && confirmReset} onOpenChange={setConfirmReset}>
@@ -332,6 +365,7 @@ function SimpleCardTile({
   imageUrl,
   hiddenLabel,
   onTap,
+  onMakeGuardian,
 }: {
   instance: SimulationCard;
   state: SimpleCardState;
@@ -339,6 +373,7 @@ function SimpleCardTile({
   imageUrl: string;
   hiddenLabel: string;
   onTap: () => void;
+  onMakeGuardian?: () => void;
 }) {
   const stateLabel = stateLabels[state];
   const overlayClass: Record<SimpleCardState, string> = {
@@ -352,7 +387,7 @@ function SimpleCardTile({
   const name = instance.faceDown ? hiddenLabel : cardName;
 
   return (
-    <li className="min-w-0">
+    <li className="w-[80px] min-w-0 shrink-0">
       <button
         type="button"
         onClick={onTap}
@@ -361,7 +396,7 @@ function SimpleCardTile({
             ? cardName + (stateLabel ? '、' + stateLabel : '、通常') + 'を切り替える'
             : hiddenLabel + 'を公開する'
         }
-        className="relative block aspect-[5/7] w-full touch-manipulation overflow-hidden rounded-md border border-[var(--line)] bg-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
+        className="relative block h-[112px] w-[80px] touch-manipulation overflow-hidden rounded-md border border-[var(--line)] bg-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
       >
         {!instance.faceDown ? (
           <img
@@ -387,6 +422,21 @@ function SimpleCardTile({
       <p className="mt-1 line-clamp-2 min-h-10 break-words text-sm leading-5">
         {name}
       </p>
+      {onMakeGuardian && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onMakeGuardian}
+          aria-label={
+            instance.faceDown
+              ? hiddenLabel + 'を裏向きのガーディアンにする'
+              : cardName + 'を裏向きのガーディアンにする'
+          }
+          className="mt-1 h-8 w-full border-[var(--line)] bg-white px-1 text-xs!"
+        >
+          ガーディアンへ
+        </Button>
+      )}
     </li>
   );
 }

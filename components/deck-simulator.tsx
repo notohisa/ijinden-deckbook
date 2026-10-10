@@ -162,39 +162,46 @@ function getMoveDestinations(
         ? [
             { zone: 'mana', label: 'マリョクへ' },
             { zone: 'graveyard', label: '墓地へ' },
+            { zone: 'guardians', label: 'ガーディアンへ' },
           ]
         : [
             { zone: 'battlefield', label: '戦場へ' },
             { zone: 'mana', label: 'マリョクへ' },
             { zone: 'graveyard', label: '墓地へ' },
+            { zone: 'guardians', label: 'ガーディアンへ' },
           ];
     case 'battlefield':
       return [
         { zone: 'hand', label: '手札へ' },
         { zone: 'mana', label: 'マリョクへ' },
         { zone: 'graveyard', label: '墓地へ' },
+        { zone: 'guardians', label: 'ガーディアンへ' },
       ];
     case 'mana':
       return isManaOrMagic(card)
         ? [
             { zone: 'hand', label: '手札へ' },
             { zone: 'graveyard', label: '墓地へ' },
+            { zone: 'guardians', label: 'ガーディアンへ' },
           ]
         : [
             { zone: 'battlefield', label: '戦場へ' },
             { zone: 'hand', label: '手札へ' },
             { zone: 'graveyard', label: '墓地へ' },
+            { zone: 'guardians', label: 'ガーディアンへ' },
           ];
     case 'graveyard':
       return isManaOrMagic(card)
         ? [
             { zone: 'hand', label: '手札へ' },
             { zone: 'mana', label: 'マリョクへ' },
+            { zone: 'guardians', label: 'ガーディアンへ' },
           ]
         : [
             { zone: 'battlefield', label: '戦場へ' },
             { zone: 'hand', label: '手札へ' },
             { zone: 'mana', label: 'マリョクへ' },
+            { zone: 'guardians', label: 'ガーディアンへ' },
           ];
     case 'guardians':
       return [
@@ -400,23 +407,63 @@ function BoardSimulator({
 
   function moveCard(instance: SimulationCard, destination: SimulationZone) {
     const card = cardsById.get(instance.cardId);
-    onUpdateSession((current) => ({
-      ...current,
-      board: moveSimulationCard(
-        current.board,
-        instance.instanceId,
-        destination,
-      ),
-      canMulligan: false,
-    }));
+    onUpdateSession((current) => {
+      const movingCard = findSimulationCard(current.board, instance.instanceId);
+      const simpleStates = { ...current.simpleStates };
+      delete simpleStates[instance.instanceId];
+      if (
+        movingCard &&
+        isBattlefieldIjin(movingCard) &&
+        destination !== 'battlefield'
+      ) {
+        for (const attachedCard of current.board.zones.battlefield) {
+          if (attachedCard.equippedTo === instance.instanceId) {
+            delete simpleStates[attachedCard.instanceId];
+          }
+        }
+      }
+      return {
+        ...current,
+        board: moveSimulationCard(
+          current.board,
+          instance.instanceId,
+          destination,
+        ),
+        canMulligan: false,
+        simpleStates,
+      };
+    });
     setSelectedInstanceId(null);
     setEquipSourceId(null);
     setMessage(
-      (card?.name ?? 'カード') +
-        'を' +
-        zoneNames[destination] +
-        'へ移動しました。',
+      destination === 'guardians'
+        ? 'カードを裏向きのガーディアンへ移動しました。'
+        : (card?.name ?? 'カード') +
+            'を' +
+            zoneNames[destination] +
+            'へ移動しました。',
     );
+  }
+
+  function moveTopDeckCardToGuardian() {
+    if (!session || session.board.zones.deck.length === 0) return;
+    onUpdateSession((current) => {
+      const topCard = current.board.zones.deck[0];
+      if (!topCard) return current;
+      const simpleStates = { ...current.simpleStates };
+      delete simpleStates[topCard.instanceId];
+      return {
+        ...current,
+        board: moveSimulationCard(
+          current.board,
+          topCard.instanceId,
+          'guardians',
+        ),
+        canMulligan: false,
+        simpleStates,
+      };
+    });
+    setMessage('山札の上から1枚を裏向きのガーディアンへ移動しました。');
   }
 
   function flipCard(instance: SimulationCard) {
@@ -454,6 +501,11 @@ function BoardSimulator({
       ...current,
       board: unequipSimulationCard(current.board, instance.instanceId),
       canMulligan: false,
+      simpleStates: Object.fromEntries(
+        Object.entries(current.simpleStates).filter(
+          ([instanceId]) => instanceId !== instance.instanceId,
+        ),
+      ),
     }));
     setSelectedInstanceId(null);
     setMessage((card?.name ?? 'カード') + 'の装備を解除しました。');
@@ -476,6 +528,11 @@ function BoardSimulator({
         ijinInstance.instanceId,
       ),
       canMulligan: false,
+      simpleStates: Object.fromEntries(
+        Object.entries(current.simpleStates).filter(
+          ([instanceId]) => instanceId !== equipSource.instanceId,
+        ),
+      ),
     }));
     setEquipSourceId(null);
     setMessage(equipmentName + 'を' + ijinName + 'へ装備しました。');
@@ -519,7 +576,7 @@ function BoardSimulator({
         </div>
         {!session && (
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            レシピのメインデッキを、手札・戦場・マリョク・墓地で動かせます。サイドデッキは使いません。
+            レシピのメインデッキを、手札・戦場・マリョク・墓地・ガーディアンで動かせます。サイドデッキは使いません。
           </p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -575,6 +632,15 @@ function BoardSimulator({
                 className="h-11 px-4 text-sm"
               >
                 1枚引く
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={moveTopDeckCardToGuardian}
+                disabled={session.board.zones.deck.length === 0}
+                className="h-11 border-[var(--line)] bg-white px-3 text-sm"
+              >
+                山札の上からガーディアンへ
               </Button>
               <Button
                 type="button"
@@ -650,7 +716,6 @@ function BoardSimulator({
                           key={instance.instanceId}
                           instance={instance}
                           card={card}
-                          className="w-24 sm:w-28"
                           onTap={() =>
                             setSelectedInstanceId(instance.instanceId)
                           }
@@ -687,7 +752,7 @@ function BoardSimulator({
                 {battlefieldOthers.length > 0 && (
                   <div className="mt-4 border-t border-[var(--line)] pt-3">
                     <p className="text-sm font-medium">その他</p>
-                    <ul className="mt-2 grid grid-cols-3 gap-2 min-[420px]:grid-cols-4 sm:grid-cols-5">
+                    <ul className="mt-2 flex flex-wrap items-start gap-2">
                       {battlefieldOthers.map((instance) => {
                         const card = cardsById.get(instance.cardId);
                         return card ? (
@@ -752,7 +817,7 @@ function BoardSimulator({
             title="ガーディアン"
             count={session.board.zones.guardians.length}
             emptyMessage="ガーディアンはいません。"
-            className="max-w-md grid-cols-4"
+            className="max-w-md"
             collapsed={collapsedZones.guardians}
             onToggle={() => toggleZone('guardians')}
           >
@@ -857,6 +922,14 @@ function BoardSimulator({
                         }
                       >
                         墓地へ
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 border-[var(--line)] bg-white"
+                        onClick={() => moveCard(selectedInstance, 'guardians')}
+                      >
+                        ガーディアンへ
                       </Button>
                     </>
                   ) : (
@@ -1089,12 +1162,7 @@ function ZonePanel({
           {emptyMessage}
         </p>
       ) : !collapsed ? (
-        <ul
-          className={
-            'mt-3 grid grid-cols-3 gap-2 min-[420px]:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 ' +
-            className
-          }
-        >
+        <ul className={'mt-3 flex flex-wrap items-start gap-2 ' + className}>
           {children}
         </ul>
       ) : null}
@@ -1142,7 +1210,7 @@ function IjinWithEquipment({
   onTap: (instance: SimulationCard) => void;
 }) {
   return (
-    <li className="w-24 min-w-0 sm:w-28">
+    <li className="w-[80px] min-w-0 shrink-0">
       <SimulationCardTile
         instance={instance}
         card={card}
@@ -1150,18 +1218,17 @@ function IjinWithEquipment({
         onTap={() => onTap(instance)}
       />
       {equipment.length > 0 && (
-        <ul className="ml-4 mt-[-0.5rem] flex flex-wrap items-start">
-          {equipment.map((equipmentInstance, index) => {
+        <ul className="mt-2 flex flex-wrap items-start gap-2">
+          {equipment.map((equipmentInstance) => {
             const equipmentCard = cardsById.get(equipmentInstance.cardId);
             return equipmentCard ? (
               <li
                 key={equipmentInstance.instanceId}
-                className={index === 0 ? '' : '-ml-6 mt-3'}
+                className="w-[80px] shrink-0"
               >
                 <SimulationCardTile
                   instance={equipmentInstance}
                   card={equipmentCard}
-                  compact
                   listItem={false}
                   onTap={() => onTap(equipmentInstance)}
                 />
@@ -1178,16 +1245,12 @@ function SimulationCardTile({
   instance,
   card,
   index,
-  compact = false,
-  className = '',
   listItem = true,
   onTap,
 }: {
   instance: SimulationCard;
   card: IjindenCard;
   index?: number;
-  compact?: boolean;
-  className?: string;
   listItem?: boolean;
   onTap: () => void;
 }) {
@@ -1196,7 +1259,7 @@ function SimulationCardTile({
     : card.name;
   const imageClass = instance.isGrayedOut ? 'grayscale opacity-60' : '';
   const cardTile = (
-    <div className={(compact ? 'w-16' : 'min-w-0') + ' ' + className}>
+    <div className="w-[80px] min-w-0 shrink-0">
       <button
         type="button"
         onClick={onTap}
@@ -1209,7 +1272,7 @@ function SimulationCardTile({
               : 'の操作メニューを開く')
         }
         className={
-          'relative block aspect-[5/7] w-full touch-manipulation overflow-hidden rounded-md border border-[var(--line)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)] ' +
+          'relative block h-[112px] w-[80px] touch-manipulation overflow-hidden rounded-md border border-[var(--line)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)] ' +
           imageClass
         }
       >
@@ -1235,11 +1298,9 @@ function SimulationCardTile({
           </span>
         )}
       </button>
-      {!compact && (
-        <p className="mt-1 line-clamp-2 min-h-10 break-words text-sm leading-5">
-          {name}
-        </p>
-      )}
+      <p className="mt-1 line-clamp-2 min-h-10 break-words text-sm leading-5">
+        {name}
+      </p>
     </div>
   );
 
