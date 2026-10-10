@@ -61,6 +61,9 @@ export default function Home() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [activeDeck, setActiveDeck] = useState<Deck>(initialDeck);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [selectedDeckCardIds, setSelectedDeckCardIds] = useState<
+    readonly string[] | null
+  >(null);
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
   const [archiveLoad, setArchiveLoad] = useState<ArchiveLoadResult | null>(
     null,
@@ -106,6 +109,16 @@ export default function Home() {
       setToast(null);
       noticeTimerRef.current = null;
     }, 4500);
+  }
+
+  function openDeckCard(cardId: string, orderedCardIds: readonly string[]) {
+    setSelectedDeckCardIds(orderedCardIds);
+    setSelectedCardId(cardId);
+  }
+
+  function openCatalogCard(cardId: string) {
+    setSelectedDeckCardIds(null);
+    setSelectedCardId(cardId);
   }
 
   useEffect(
@@ -493,7 +506,7 @@ export default function Home() {
                 cards={cards}
                 activeDeck={activeDeck}
                 onAdjustCard={adjustCard}
-                onSelectCard={setSelectedCardId}
+                onSelectCard={openCatalogCard}
               />
             </div>
             {activeTab === 'recipe' && (
@@ -511,7 +524,7 @@ export default function Home() {
                 }
                 onAdjustCard={adjustCard}
                 onMoveCard={moveCard}
-                onSelectCard={setSelectedCardId}
+                onSelectCard={openDeckCard}
                 onOpenCards={() => setActiveTab('cards')}
                 onOpenSimulator={() => setActiveTab('simulator')}
               />
@@ -559,8 +572,13 @@ export default function Home() {
       )}
       <CardDetailDialog
         card={selectedCard}
+        navigationCardIds={selectedDeckCardIds}
+        onNavigate={(cardId) => setSelectedCardId(cardId)}
         onOpenChange={(open) => {
-          if (!open) setSelectedCardId(null);
+          if (!open) {
+            setSelectedCardId(null);
+            setSelectedDeckCardIds(null);
+          }
         }}
       />
       {pendingImport && (

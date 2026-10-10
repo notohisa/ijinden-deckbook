@@ -35,7 +35,7 @@ type Props = {
   onNameChange: (name: string) => void;
   onAdjustCard: (cardId: string, pile: Pile, difference: number) => void;
   onMoveCard: (cardId: string, pile: Pile) => void;
-  onSelectCard: (cardId: string) => void;
+  onSelectCard: (cardId: string, orderedCardIds: readonly string[]) => void;
   onOpenCards: () => void;
   onOpenSimulator: () => void;
 };
@@ -317,7 +317,7 @@ function DeckPile({
   cardOrder: ReadonlyMap<string, number>;
   onAdjust: (cardId: string, pile: Pile, difference: number) => void;
   onMoveCard: (cardId: string, pile: Pile) => void;
-  onSelectCard: (cardId: string) => void;
+  onSelectCard: (cardId: string, orderedCardIds: readonly string[]) => void;
   selectedCardKey: string | null;
   onSelectCardForControls: (key: string) => void;
 }) {
@@ -337,6 +337,7 @@ function DeckPile({
         (cardOrder.get(left.card.id) ?? 0) -
           (cardOrder.get(right.card.id) ?? 0),
     );
+  const orderedCardIds = entries.map(({ card }) => card.id);
   return (
     <section className="mb-6 last:mb-0">
       <div className="mb-2 flex items-center justify-between">
@@ -400,7 +401,7 @@ function DeckPile({
                     </Button>
                     <button
                       type="button"
-                      onClick={() => onSelectCard(card.id)}
+                      onClick={() => onSelectCard(card.id, orderedCardIds)}
                       aria-label={card.name + 'の詳細を開く'}
                       className="absolute left-1/2 top-1/2 z-20 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-md border border-white/80 bg-white/95 text-base text-[var(--ink)] shadow-sm hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
                     >
