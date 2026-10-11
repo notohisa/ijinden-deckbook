@@ -14,6 +14,7 @@ import type {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DeckStatusBadge } from '@/components/deck-status-badge';
+import { DeckShareActions } from '@/components/deck-share-actions';
 import { RegulationStatus } from '@/components/regulation-status';
 import { cardTypes, countByCardType, countCards } from '@/lib/deck-utils';
 
@@ -131,6 +132,7 @@ export function DeckRecipe({
             className="h-11 w-full border-[var(--line)] bg-white px-3 text-base shadow-none"
           />
         </div>
+        <DeckShareActions deck={deck} cardsById={cardsById} />
         <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--line)] rounded-xl border border-[var(--line)] bg-[var(--soft)]">
           <Stat label="MAIN" value={String(validation.mainCount)} />
           <Stat label="SIDE" value={String(validation.sideCount)} />

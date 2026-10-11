@@ -17,6 +17,7 @@ import { CardDetailDialog } from '@/components/card-detail-dialog';
 import { DeckRecipe } from '@/components/deck-recipe';
 import { DeckSimulator } from '@/components/deck-simulator';
 import { ImportDeckDialog } from '@/components/import-deck-dialog';
+import { IncomingDeckShare } from '@/components/incoming-deck-share';
 import { MyDecks } from '@/components/my-decks';
 import { PhotoImportDialog } from '@/components/photo-import-dialog';
 import { Button } from '@/components/ui/button';
@@ -606,6 +607,13 @@ export default function Home() {
           }
         />
       )}
+      <IncomingDeckShare
+        cardsById={cardsById}
+        canImport={archiveLoad?.status === 'ready'}
+        onImport={(deck) =>
+          setPendingImport({ decks: [deck], invalidDecks: [], totalCount: 1 })
+        }
+      />
       {pendingImport && (
         <ImportDeckDialog
           open
