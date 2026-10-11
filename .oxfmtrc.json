@@ -4,6 +4,10 @@
   "printWidth": 80,
   "sortPackageJson": false,
   "ignorePatterns": [
+    "public/vendor/**",
+    "public/photo-card-index.json",
+    "work/**",
+    "dist-pages/**",
     "package-lock.json",
     "pnpm-lock.yaml",
     "yarn.lock",

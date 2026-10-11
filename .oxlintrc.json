@@ -23,6 +23,9 @@
     "typeCheck": true
   },
   "ignorePatterns": [
+    "public/vendor/**",
+    "work/**",
+    "dist-pages/**",
     ".next/**",
     ".vinext/**",
     "out/**",

@@ -18,6 +18,7 @@ import { DeckRecipe } from '@/components/deck-recipe';
 import { DeckSimulator } from '@/components/deck-simulator';
 import { ImportDeckDialog } from '@/components/import-deck-dialog';
 import { MyDecks } from '@/components/my-decks';
+import { PhotoImportDialog } from '@/components/photo-import-dialog';
 import { Button } from '@/components/ui/button';
 import { applyCardCatalogCorrections } from '@/lib/card-catalog-corrections';
 import { applyEffectProcessTags } from '@/lib/card-effect-processes';
@@ -74,6 +75,7 @@ export default function Home() {
   const [toast, setToast] = useState<string | null>(null);
   const [pendingImport, setPendingImport] =
     useState<DeckImportParseResult | null>(null);
+  const [photoImportOpen, setPhotoImportOpen] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
   const validation = useMemo(
@@ -410,6 +412,19 @@ export default function Home() {
               <span className="min-[420px]:hidden">↑</span>
               <span className="hidden min-[420px]:inline">↑ インポート</span>
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[var(--line)] bg-white/70 max-[419px]:px-1.5"
+              onClick={() => setPhotoImportOpen(true)}
+              aria-label="写真からデッキを取り込む"
+              disabled={archiveLoad?.status !== 'ready'}
+            >
+              <span className="min-[560px]:hidden">▧ 写真</span>
+              <span className="hidden min-[560px]:inline">
+                ▧ 写真から取り込み
+              </span>
+            </Button>
           </div>
         </div>
         <nav
@@ -581,6 +596,16 @@ export default function Home() {
           }
         }}
       />
+      {photoImportOpen && (
+        <PhotoImportDialog
+          open
+          cards={cards}
+          onOpenChange={setPhotoImportOpen}
+          onImport={(deck) =>
+            setPendingImport({ decks: [deck], invalidDecks: [], totalCount: 1 })
+          }
+        />
+      )}
       {pendingImport && (
         <ImportDeckDialog
           open
