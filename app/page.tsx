@@ -20,7 +20,6 @@ import { ImportDeckDialog } from '@/components/import-deck-dialog';
 import { DeckImportSourceDialog } from '@/components/deck-import-source-dialog';
 import { IncomingDeckShare } from '@/components/incoming-deck-share';
 import { MyDecks } from '@/components/my-decks';
-import { PhotoImportDialog } from '@/components/photo-import-dialog';
 import { Button } from '@/components/ui/button';
 import { applyCardCatalogCorrections } from '@/lib/card-catalog-corrections';
 import { applyEffectProcessTags } from '@/lib/card-effect-processes';
@@ -78,7 +77,6 @@ export default function Home() {
   const [toast, setToast] = useState<string | null>(null);
   const [pendingImport, setPendingImport] =
     useState<DeckImportParseResult | null>(null);
-  const [photoImportOpen, setPhotoImportOpen] = useState(false);
   const [importSourceOpen, setImportSourceOpen] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
@@ -413,21 +411,7 @@ export default function Home() {
               aria-label="マイデッキをインポート"
               disabled={archiveLoad?.status !== 'ready'}
             >
-              <span className="min-[420px]:hidden">↑</span>
-              <span className="hidden min-[420px]:inline">↑ インポート</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[var(--line)] bg-white/70 max-[419px]:px-1.5"
-              onClick={() => setPhotoImportOpen(true)}
-              aria-label="写真からデッキを取り込む"
-              disabled={archiveLoad?.status !== 'ready'}
-            >
-              <span className="min-[560px]:hidden">▧ 写真</span>
-              <span className="hidden min-[560px]:inline">
-                ▧ 写真から取り込み
-              </span>
+              ↑ インポート
             </Button>
           </div>
         </div>
@@ -609,16 +593,6 @@ export default function Home() {
             setPendingImport(
               parseDeckTextImport(source, cards, name, selections),
             )
-          }
-        />
-      )}
-      {photoImportOpen && (
-        <PhotoImportDialog
-          open
-          cards={cards}
-          onOpenChange={setPhotoImportOpen}
-          onImport={(deck) =>
-            setPendingImport({ decks: [deck], invalidDecks: [], totalCount: 1 })
           }
         />
       )}
@@ -881,7 +855,7 @@ function Help() {
               データを復元する・別の端末に移す（インポート）
             </h3>
             <p className="text-[var(--muted)]">
-              画面上の「インポート」から保存しておいたファイルを選ぶと、以前のデッキを読み込めます。
+              画面上の「インポート」→「JSONファイルを選ぶ」から保存しておいたファイルを選ぶと、以前のデッキを読み込めます。
             </p>
             <p className="text-[var(--muted)]">
               必要なデッキだけを選んで取り込むことも、まとめて取り込むこともできます。
@@ -889,6 +863,22 @@ function Help() {
             <p className="rounded-lg bg-[var(--soft)] px-3 py-2 text-xs leading-6 text-[var(--muted)]">
               ※
               すでに同じ名前のデッキがある場合は、そのデッキが更新されます。インポート前の確認画面で「新規」または「更新」と表示されるので、内容を確認してから取り込んでください。
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-medium text-[var(--ink)]">
+              元サイトからテキストで移行する
+            </h3>
+            <ol className="list-decimal space-y-1 pl-5 text-[var(--muted)] marker:font-medium marker:text-[var(--red)]">
+              <li>元サイトのレシピで「テキストデータをコピー」を押す</li>
+              <li>
+                このデッキ帳の「インポート」を開き、「コピーしたテキスト」に貼り付ける
+              </li>
+              <li>必要ならデッキ名を入力し、「内容を確認する」を押す</li>
+              <li>枚数を確認して「1件をインポート」を押す</li>
+            </ol>
+            <p className="text-[var(--muted)]">
+              メインデッキとサイドデッキの見出しを含めて、1デッキ分ずつ貼り付けてください。
             </p>
           </div>
           <div className="space-y-2">
@@ -932,7 +922,7 @@ function Help() {
                 インポートができない
               </strong>
               <p>
-                このデッキ帳からエクスポートしたJSONファイルを選んでいるか確認してください。
+                ファイルの場合は、このデッキ帳からエクスポートしたJSONファイルを選んでください。テキストの場合は、メインデッキ・サイドデッキの見出しを含む全体を貼り付け、表示されたエラーの行や枚数を確認してください。
               </p>
             </li>
             <li>
