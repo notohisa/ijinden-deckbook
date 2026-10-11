@@ -17,6 +17,7 @@ import { CardDetailDialog } from '@/components/card-detail-dialog';
 import { DeckRecipe } from '@/components/deck-recipe';
 import { DeckSimulator } from '@/components/deck-simulator';
 import { ImportDeckDialog } from '@/components/import-deck-dialog';
+import { DeckImportSourceDialog } from '@/components/deck-import-source-dialog';
 import { IncomingDeckShare } from '@/components/incoming-deck-share';
 import { MyDecks } from '@/components/my-decks';
 import { PhotoImportDialog } from '@/components/photo-import-dialog';
@@ -24,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { applyCardCatalogCorrections } from '@/lib/card-catalog-corrections';
 import { applyEffectProcessTags } from '@/lib/card-effect-processes';
 import { mergeImportedDecks, parseDeckImport } from '@/lib/deck-import';
+import { parseDeckTextImport } from '@/lib/deck-text-import';
 import {
   type ArchiveLoadResult,
   loadStoredArchive,
@@ -77,6 +79,7 @@ export default function Home() {
   const [pendingImport, setPendingImport] =
     useState<DeckImportParseResult | null>(null);
   const [photoImportOpen, setPhotoImportOpen] = useState(false);
+  const [importSourceOpen, setImportSourceOpen] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
   const validation = useMemo(
@@ -406,7 +409,7 @@ export default function Home() {
               variant="outline"
               size="sm"
               className="border-[var(--line)] bg-white/70 max-[419px]:px-1.5"
-              onClick={() => importFileInputRef.current?.click()}
+              onClick={() => setImportSourceOpen(true)}
               aria-label="マイデッキをインポート"
               disabled={archiveLoad?.status !== 'ready'}
             >
@@ -597,6 +600,18 @@ export default function Home() {
           }
         }}
       />
+      {importSourceOpen && (
+        <DeckImportSourceDialog
+          open
+          onOpenChange={setImportSourceOpen}
+          onChooseFile={() => importFileInputRef.current?.click()}
+          onInspectText={(source, name, selections) =>
+            setPendingImport(
+              parseDeckTextImport(source, cards, name, selections),
+            )
+          }
+        />
+      )}
       {photoImportOpen && (
         <PhotoImportDialog
           open
