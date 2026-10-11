@@ -5,6 +5,7 @@ import type {
   ImportPreviewItem,
 } from '@/app/types/deck';
 import { normalizedDeckName } from './deck-utils.ts';
+import { migrateCardIdsInPile } from './card-id-migration.ts';
 
 function parsePile(
   value: unknown,
@@ -12,14 +13,17 @@ function parsePile(
 ): Record<string, number> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const entries = Object.entries(value);
-  if (
-    !entries.every(
-      ([cardId, count]) =>
-        knownCardIds.has(cardId) && Number.isSafeInteger(count) && count > 0,
-    )
-  )
+  if (!entries.every(([, count]) => Number.isSafeInteger(count) && count > 0)) {
     return null;
-  return Object.fromEntries(entries) as Record<string, number>;
+  }
+  const migrated = migrateCardIdsInPile(value as Record<string, number>);
+  if (
+    !migrated ||
+    !Object.keys(migrated).every((cardId) => knownCardIds.has(cardId))
+  ) {
+    return null;
+  }
+  return migrated;
 }
 
 export function parseImportedDeck(

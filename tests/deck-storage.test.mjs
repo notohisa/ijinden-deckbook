@@ -188,6 +188,160 @@ test('normal v2 data loads as saved decks and an independent draft clone', () =>
   assert.equal(draft.main['01-003'], 3);
 });
 
+test('v2 saved decks and the active draft migrate both piles and combine aliased counts', () => {
+  const saved = {
+    ...deck(
+      'saved',
+      'Saved',
+      { 'PSR-01-008': 2, 'FA-SR-01-001': 1, 'HW-SR-01-007': 1, '01-001': 4 },
+      { 'HW-SR-01-007': 2, '01-002': 1 },
+      true,
+    ),
+    customMetadata: { source: 'saved deck' },
+  };
+  const draft = {
+    ...deck(
+      'draft',
+      'Draft',
+      { 'HW-SR-01-007': 3, 'FA-SR-01-003': 1 },
+      { 'PSR-01-008': 1, 'FA-SR-01-001': 2 },
+      true,
+    ),
+    customMetadata: { source: 'active draft' },
+  };
+  const result = loadStoredArchive(() =>
+    rawArchive({ version: 2, decks: [saved], draft }),
+  );
+
+  assert.equal(result.status, 'ready');
+  if (result.status !== 'ready') return;
+  assert.deepEqual(result.decks[0].main, {
+    'FA-SR-01-001': 3,
+    'FA-SR-01-003': 1,
+    '01-001': 4,
+  });
+  assert.deepEqual(result.decks[0].side, {
+    'FA-SR-01-003': 2,
+    '01-002': 1,
+  });
+  assert.deepEqual(result.draft?.main, { 'FA-SR-01-003': 4 });
+  assert.deepEqual(result.draft?.side, { 'FA-SR-01-001': 3 });
+  assert.equal(result.decks[0].id, 'saved');
+  assert.equal(result.draft?.id, 'draft');
+  assert.equal(result.decks[0].customMetadata.source, 'saved deck');
+  assert.equal(result.draft?.customMetadata.source, 'active draft');
+  assert.equal(result.decks[0].isSaved, true);
+  assert.equal(result.draft?.isSaved, false);
+  assert.equal(result.decks[0].main['FA-SR-01-002'], undefined);
+  assert.equal(result.draft?.main['FA-SR-01-002'], undefined);
+  assert.deepEqual(saved.main, {
+    'PSR-01-008': 2,
+    'FA-SR-01-001': 1,
+    'HW-SR-01-007': 1,
+    '01-001': 4,
+  });
+});
+
+test('v1 saved decks and the copied legacy draft migrate aliases in main and side', () => {
+  const saved = deck(
+    'saved',
+    'Saved',
+    { 'PSR-01-008': 2 },
+    { 'HW-SR-01-007': 3 },
+    true,
+  );
+  const legacyDraft = deck(
+    'legacy-draft',
+    'Draft',
+    { 'HW-SR-01-007': 4 },
+    { 'PSR-01-008': 5 },
+    false,
+  );
+  const result = loadStoredArchive(() =>
+    rawArchive({ version: 1, decks: [saved, legacyDraft] }),
+  );
+
+  assert.equal(result.status, 'ready');
+  if (result.status !== 'ready') return;
+  assert.deepEqual(result.decks[0].main, { 'FA-SR-01-001': 2 });
+  assert.deepEqual(result.decks[0].side, { 'FA-SR-01-003': 3 });
+  assert.deepEqual(result.draft?.main, { 'FA-SR-01-003': 4 });
+  assert.deepEqual(result.draft?.side, { 'FA-SR-01-001': 5 });
+  assert.notEqual(result.draft?.id, legacyDraft.id);
+  assert.equal(result.decks[0].id, saved.id);
+  assert.deepEqual(legacyDraft.side, { 'PSR-01-008': 5 });
+});
+
+test('migration stays canonical through archive save, reload, and JSON re-import', async () => {
+  const { parseDeckImport } = await import('../lib/deck-import.ts');
+  const original = rawArchive({
+    version: 2,
+    decks: [
+      deck(
+        'saved',
+        'Saved',
+        { 'PSR-01-008': 2, 'FA-SR-01-001': 1 },
+        { 'HW-SR-01-007': 3 },
+      ),
+    ],
+    draft: deck('draft', 'Draft', { 'HW-SR-01-007': 1 }, {}),
+  });
+  const firstLoad = loadStoredArchive(() => original);
+  assert.equal(firstLoad.status, 'ready');
+  if (firstLoad.status !== 'ready') return;
+  const archive = {
+    version: 2,
+    updatedAt: '2026-09-11T00:00:00.000Z',
+    decks: firstLoad.decks,
+    draft: firstLoad.draft,
+  };
+  const writes = [];
+  saveStoredArchive(firstLoad, archive, (raw) => writes.push(raw));
+  assert.equal(writes.length, 1);
+
+  const secondLoad = loadStoredArchive(() => writes[0]);
+  assert.equal(secondLoad.status, 'ready');
+  if (secondLoad.status !== 'ready') return;
+  assert.deepEqual(secondLoad.decks[0].main, { 'FA-SR-01-001': 3 });
+  assert.deepEqual(secondLoad.decks[0].side, { 'FA-SR-01-003': 3 });
+  assert.deepEqual(secondLoad.draft?.main, { 'FA-SR-01-003': 1 });
+  const imported = parseDeckImport(
+    { decks: secondLoad.decks },
+    new Set(['FA-SR-01-001', 'FA-SR-01-002', 'FA-SR-01-003']),
+  );
+  assert.deepEqual(imported.invalidDecks, []);
+  assert.deepEqual(imported.decks[0].main, { 'FA-SR-01-001': 3 });
+  assert.deepEqual(imported.decks[0].side, { 'FA-SR-01-003': 3 });
+});
+
+test('aliased count overflow blocks the archive and prevents replacing its raw value', () => {
+  const raw = rawArchive({
+    version: 2,
+    decks: [
+      deck('saved', 'Saved', {
+        'PSR-01-008': Number.MAX_SAFE_INTEGER,
+        'FA-SR-01-001': 1,
+      }),
+    ],
+    draft: deck('draft'),
+  });
+  const result = loadStoredArchive(() => raw);
+  assert.deepEqual(result, { status: 'blocked', raw, reason: 'invalid-data' });
+
+  const writes = [];
+  saveStoredArchive(
+    result,
+    {
+      version: 2,
+      updatedAt: '2026-09-11T00:00:00.000Z',
+      decks: [],
+      draft: deck('new-draft'),
+    },
+    (value) => writes.push(value),
+  );
+  assert.deepEqual(writes, []);
+});
+
 test('normal v1 data separates saved decks and copies the first legacy draft', () => {
   const saved = deck('saved', 'Saved', { '01-001': 2 }, {}, true);
   const legacyDraft = deck('draft', 'Draft', { '01-002': 3 }, {}, false);

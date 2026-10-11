@@ -7,7 +7,13 @@ import {
   parseDeckImport,
 } from '../lib/deck-import.ts';
 
-const knownCardIds = new Set(['01-001', '01-002']);
+const knownCardIds = new Set([
+  '01-001',
+  '01-002',
+  'FA-SR-01-001',
+  'FA-SR-01-002',
+  'FA-SR-01-003',
+]);
 
 function deck(id, name, main = { '01-001': 40 }) {
   return {
@@ -30,6 +36,58 @@ test('既存エクスポート形式を解析し、不正なカードだけを�
   assert.equal(result.decks[0].name, '赤単');
   assert.equal(result.invalidDecks.length, 1);
   assert.equal(result.invalidDecks[0].name, '不正');
+});
+
+test('JSON imports migrate aliases before checking known IDs and retain summed counts', () => {
+  const result = parseDeckImport(
+    {
+      decks: [
+        {
+          ...deck('legacy', '旧IDを含むデッキ', {
+            'PSR-01-008': 2,
+            'FA-SR-01-001': 1,
+            'HW-SR-01-007': 3,
+            'FA-SR-01-002': 4,
+          }),
+          side: { 'HW-SR-01-007': 1, 'FA-SR-01-003': 2, '01-002': 1 },
+        },
+        deck('unknown', '未知ID', { 'unknown-card': 1 }),
+      ],
+    },
+    knownCardIds,
+  );
+
+  assert.equal(result.totalCount, 2);
+  assert.equal(result.decks.length, 1);
+  assert.deepEqual(result.decks[0].main, {
+    'FA-SR-01-001': 3,
+    'FA-SR-01-003': 3,
+    'FA-SR-01-002': 4,
+  });
+  assert.deepEqual(result.decks[0].side, {
+    'FA-SR-01-003': 3,
+    '01-002': 1,
+  });
+  assert.equal(result.invalidDecks.length, 1);
+  assert.equal(result.invalidDecks[0].name, '未知ID');
+});
+
+test('import rejects unsafe counts created by combining an old and canonical ID', () => {
+  const result = parseDeckImport(
+    {
+      decks: [
+        deck('overflow', '枚数超過', {
+          'PSR-01-008': Number.MAX_SAFE_INTEGER,
+          'FA-SR-01-001': 1,
+        }),
+      ],
+    },
+    knownCardIds,
+  );
+
+  assert.deepEqual(result.decks, []);
+  assert.equal(result.invalidDecks.length, 1);
+  assert.equal(result.invalidDecks[0].name, '枚数超過');
 });
 
 test('同名の既存デッキは更新、それ以外は新規としてプレビューする', () => {

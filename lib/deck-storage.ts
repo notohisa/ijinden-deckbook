@@ -1,5 +1,6 @@
 import type { ArchiveData, Deck } from '@/app/types/deck';
 import { copyDeckAsDraft } from './deck-utils.ts';
+import { migrateCardIdsInPile } from './card-id-migration.ts';
 
 export const localStorageKey = 'ijinden-deckbook-v1';
 
@@ -36,15 +37,19 @@ function isStoredDeck(value: unknown): value is Deck {
   );
 }
 
-function cloneStoredDeck(deck: Deck, isSaved: boolean): Deck {
+function cloneStoredDeck(deck: Deck, isSaved: boolean): Deck | null {
+  const main = migrateCardIdsInPile(deck.main);
+  const side = migrateCardIdsInPile(deck.side);
+  if (!main || !side) return null;
+
   const color =
     deck.color === 'default' || deck.color === 'orange' || deck.color === 'gray'
       ? deck.color
       : undefined;
   return {
     ...deck,
-    main: { ...deck.main },
-    side: { ...deck.side },
+    main,
+    side,
     isSaved,
     ...(color ? { color } : {}),
   };
@@ -102,11 +107,16 @@ export function loadStoredArchive(
 
   if (archive.version === 2) {
     if (!isStoredDeck(archive.draft)) return blocked(raw, 'invalid-data');
+    const decks = archive.decks.map((deck) => cloneStoredDeck(deck, true));
+    const draft = cloneStoredDeck(archive.draft, false);
+    if (decks.some((deck) => deck === null) || !draft) {
+      return blocked(raw, 'invalid-data');
+    }
     return {
       status: 'ready',
       source: 'v2',
-      decks: archive.decks.map((deck) => cloneStoredDeck(deck, true)),
-      draft: cloneStoredDeck(archive.draft, false),
+      decks: decks.filter((deck): deck is Deck => deck !== null),
+      draft,
     };
   }
 
@@ -114,11 +124,17 @@ export function loadStoredArchive(
     .filter((deck) => deck.isSaved)
     .map((deck) => cloneStoredDeck(deck, true));
   const legacyDraft = archive.decks.find((deck) => !deck.isSaved);
+  const draft = legacyDraft
+    ? cloneStoredDeck(copyDeckAsDraft(legacyDraft), false)
+    : null;
+  if (savedDecks.some((deck) => deck === null) || (legacyDraft && !draft)) {
+    return blocked(raw, 'invalid-data');
+  }
   return {
     status: 'ready',
     source: 'v1',
-    decks: savedDecks,
-    draft: legacyDraft ? copyDeckAsDraft(legacyDraft) : null,
+    decks: savedDecks.filter((deck): deck is Deck => deck !== null),
+    draft,
   };
 }
 
