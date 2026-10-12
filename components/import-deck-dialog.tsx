@@ -22,6 +22,7 @@ type Props = {
   importedDecks: readonly Deck[];
   invalidDecks: readonly DeckImportError[];
   totalCount: number;
+  legacySummary?: { skippedCount: number; renamedCount: number };
   existingDecks: readonly Deck[];
   cardsById: ReadonlyMap<string, AppCard>;
   onOpenChange: (open: boolean) => void;
@@ -33,6 +34,7 @@ export function ImportDeckDialog({
   importedDecks,
   invalidDecks,
   totalCount,
+  legacySummary,
   existingDecks,
   cardsById,
   onOpenChange,
@@ -70,6 +72,23 @@ export function ImportDeckDialog({
             件のデッキを確認しました。選んだデッキだけを取り込みます。
           </DialogDescription>
         </DialogHeader>
+        {legacySummary && (
+          <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-950">
+            <p className="font-medium">旧サイトのデッキを確認しました</p>
+            <p>
+              取り込み候補 {items.length}件・同じ内容で省略{' '}
+              {legacySummary.skippedCount}件
+            </p>
+            {legacySummary.renamedCount > 0 && (
+              <p>
+                名前を調整したデッキ {legacySummary.renamedCount}
+                件（同名・名前なし・前後の空白など）
+              </p>
+            )}
+            <p>既存のデッキを残して追加します。</p>
+            {items.length === 0 && <p>取り込む新しいデッキはありません。</p>}
+          </div>
+        )}
         {invalidDecks.length > 0 && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
             <p className="font-medium">

@@ -25,6 +25,7 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChooseFile: () => void;
+  onLegacyMigration: () => void;
   onInspectText: (
     source: string,
     name: string,
@@ -36,6 +37,7 @@ export function DeckImportSourceDialog({
   open,
   onOpenChange,
   onChooseFile,
+  onLegacyMigration,
   onInspectText,
 }: Props) {
   const [name, setName] = useState('');
@@ -89,6 +91,26 @@ export function DeckImportSourceDialog({
             JSONファイルを選ぶか、コピーしたテキストを貼り付けて内容を確認します。
           </DialogDescription>
         </DialogHeader>
+
+        <section className="space-y-2 rounded-xl border border-[var(--green)] bg-emerald-50/60 p-3 sm:p-4">
+          <h2 className="font-medium text-[var(--ink)]">
+            旧サイトからまとめて移行
+          </h2>
+          <p className="text-sm leading-6 text-[var(--muted)]">
+            旧サイトに保存したマイデッキを、名前とメイン・サイドの内容ごとまとめて移せます。
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-auto min-h-11 whitespace-normal"
+            onClick={() => {
+              onOpenChange(false);
+              onLegacyMigration();
+            }}
+          >
+            旧サイトからまとめて移行
+          </Button>
+        </section>
 
         <section className="space-y-2 rounded-xl border border-[var(--line)] bg-white p-3 sm:p-4">
           <h2 className="font-medium text-[var(--ink)]">JSONファイルから</h2>

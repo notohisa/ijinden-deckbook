@@ -20,18 +20,26 @@ import { DeckRecipe } from '@/components/deck-recipe';
 import { DeckSimulator } from '@/components/deck-simulator';
 import { ImportDeckDialog } from '@/components/import-deck-dialog';
 import { DeckImportSourceDialog } from '@/components/deck-import-source-dialog';
+import { LegacyMigrationDialog } from '@/components/legacy-migration-dialog';
 import { IncomingDeckShare } from '@/components/incoming-deck-share';
 import { MyDecks } from '@/components/my-decks';
 import { Button } from '@/components/ui/button';
 import { applyCardCatalogCorrections } from '@/lib/card-catalog-corrections';
 import { applyEffectProcessTags } from '@/lib/card-effect-processes';
-import { parseDeckImport } from '@/lib/deck-import';
+import { createImportPreview, parseDeckImport } from '@/lib/deck-import';
+import {
+  LEGACY_BACKUP_TYPE,
+  parseLegacyDeckImport,
+} from '@/lib/legacy-deck-migration';
 import { Help } from '@/components/help';
 import { useDeckBook } from '@/hooks/use-deck-book';
 import { parseDeckTextImport } from '@/lib/deck-text-import';
 import { applyCardRuleMetadata } from '@/lib/deck-utils';
 
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'simulator' | 'help';
+type PendingImport = DeckImportParseResult & {
+  legacySummary?: { skippedCount: number; renamedCount: number };
+};
 
 // Card rule text and source-data corrections are applied once while building
 // the in-memory catalog. Deck data itself continues to store only IDs/counts.
@@ -52,9 +60,11 @@ export default function Home() {
     'カードを追加して、あなたの最初のデッキを作りましょう。',
   );
   const [toast, setToast] = useState<string | null>(null);
-  const [pendingImport, setPendingImport] =
-    useState<DeckImportParseResult | null>(null);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(
+    null,
+  );
   const [importSourceOpen, setImportSourceOpen] = useState(false);
+  const [legacyMigrationOpen, setLegacyMigrationOpen] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
   const showNotice = useCallback((message: string) => {
@@ -165,10 +175,24 @@ export default function Home() {
     event.target.value = '';
     if (!file) return;
     try {
-      const result = parseDeckImport(
-        JSON.parse(await file.text()) as unknown,
-        cardIds,
-      );
+      const source: unknown = JSON.parse(await file.text());
+      if (
+        source !== null &&
+        typeof source === 'object' &&
+        'type' in source &&
+        source.type === LEGACY_BACKUP_TYPE
+      ) {
+        const result = parseLegacyDeckImport(source, cardIds, decks);
+        setPendingImport({
+          ...result,
+          legacySummary: {
+            skippedCount: result.skippedCount,
+            renamedCount: result.renamedCount,
+          },
+        });
+        return;
+      }
+      const result = parseDeckImport(source, cardIds);
       if (result.decks.length === 0) {
         showNotice(
           'インポートできるデッキがありません。' +
@@ -188,7 +212,24 @@ export default function Home() {
   }
 
   async function importSelectedDecks(selectedDecks: Deck[]) {
-    if (await book.importSelectedDecks(selectedDecks)) setPendingImport(null);
+    // Another tab may have added a name after the migration preview opened.
+    // Legacy migration only adds decks; never convert that race into an update.
+    if (
+      pendingImport?.legacySummary &&
+      createImportPreview(selectedDecks, decks).some(
+        (item) => item.action === 'update',
+      )
+    ) {
+      setPendingImport(null);
+      showNotice(
+        '保存済みデッキが変更されています。既存デッキを保つため、移行ファイルを選び直してください。',
+      );
+      return;
+    }
+    if (await book.importSelectedDecks(selectedDecks)) {
+      if (pendingImport?.legacySummary) setActiveTab('myDecks');
+      setPendingImport(null);
+    }
   }
 
   return (
@@ -416,7 +457,9 @@ export default function Home() {
                 onDelete={deleteSavedDeck}
               />
             )}
-            {activeTab === 'help' && <Help />}
+            {activeTab === 'help' && (
+              <Help onLegacyMigration={() => setLegacyMigrationOpen(true)} />
+            )}
           </>
         )}
       </div>
@@ -455,11 +498,19 @@ export default function Home() {
           open
           onOpenChange={setImportSourceOpen}
           onChooseFile={() => importFileInputRef.current?.click()}
+          onLegacyMigration={() => setLegacyMigrationOpen(true)}
           onInspectText={(source, name, selections) =>
             setPendingImport(
               parseDeckTextImport(source, cards, name, selections),
             )
           }
+        />
+      )}
+      {legacyMigrationOpen && (
+        <LegacyMigrationDialog
+          open
+          onOpenChange={setLegacyMigrationOpen}
+          onChooseFile={() => importFileInputRef.current?.click()}
         />
       )}
       <IncomingDeckShare
@@ -475,6 +526,7 @@ export default function Home() {
           importedDecks={pendingImport.decks}
           invalidDecks={pendingImport.invalidDecks}
           totalCount={pendingImport.totalCount}
+          legacySummary={pendingImport.legacySummary}
           existingDecks={decks}
           cardsById={cardsById}
           onOpenChange={(open) => {

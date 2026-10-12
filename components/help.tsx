@@ -1,4 +1,6 @@
-export function Help() {
+import { Button } from '@/components/ui/button';
+
+export function Help({ onLegacyMigration }: { onLegacyMigration: () => void }) {
   return (
     <section
       className="mx-auto max-w-3xl break-words rounded-2xl border border-[var(--line)] bg-white/80 p-5 text-[15px] leading-7 shadow-[0_12px_30px_rgb(33_38_45/0.04)] sm:p-7 sm:text-base"
@@ -241,6 +243,24 @@ export function Help() {
           </div>
           <div className="space-y-2">
             <h3 className="font-medium text-[var(--ink)]">
+              旧サイトからまとめて移行する
+            </h3>
+            <p className="text-[var(--muted)]">
+              旧サイトで書き出し用ブックマークを実行し、全マイデッキを1つのJSONファイルに保存します。このデッキ帳でファイルを選ぶと、カード番号を変換してまとめて取り込めます。
+            </p>
+            <p className="text-[var(--muted)]">
+              同じカード構成は省き、同名で内容が違うデッキには「旧#番号」を付けます。元のデータは残ります。デッキを保存している端末・ブラウザで書き出してください。
+            </p>
+            <Button
+              variant="outline"
+              className="h-auto min-h-11 whitespace-normal"
+              onClick={onLegacyMigration}
+            >
+              旧サイトからまとめて移行
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-medium text-[var(--ink)]">
               元サイトからテキストで移行する
             </h3>
             <ol className="list-decimal space-y-1 pl-5 text-[var(--muted)] marker:font-medium marker:text-[var(--red)]">
@@ -296,7 +316,7 @@ export function Help() {
                 インポートができない
               </strong>
               <p>
-                ファイルの場合は、このデッキ帳からエクスポートしたJSONファイルを選んでください。テキストの場合は、メインデッキ・サイドデッキの見出しを含む全体を貼り付け、表示されたエラーの行や枚数を確認してください。
+                ファイルの場合は、このデッキ帳のエクスポートか、旧サイトの書き出し用ブックマークで保存したJSONファイルを選んでください。テキストの場合は、メインデッキ・サイドデッキの見出しを含む全体を貼り付け、表示されたエラーの行や枚数を確認してください。
               </p>
             </li>
             <li>

@@ -43,6 +43,8 @@ pnpm test:browser
 
 カード情報は `app/ijinden-cards.ts` と `app/custom-cards.ts`、ルールは `lib/deck-validator.ts` と `data/regulations.ts` にあります。保存データはカード ID と枚数を保持し、表示用情報と分けています。
 
+旧サイトの一括移行は `components/legacy-migration-dialog.tsx` の案内、`lib/legacy-deck-exporter.ts` の書き出し用ブックマーク、`lib/legacy-deck-migration.ts` の検証・変換で構成します。使い方とファイル形式は [一括移行の説明](docs/legacy-migration.md) を参照してください。
+
 ## 保存と複数タブ
 
 - 既存の `ijinden-deckbook-v1` キーと version 2 の保存形式を維持します。旧 version 1 は検証後に移行します。
