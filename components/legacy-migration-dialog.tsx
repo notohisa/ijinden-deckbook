@@ -30,7 +30,7 @@ export function LegacyMigrationDialog({
     try {
       await navigator.clipboard.writeText(LEGACY_EXPORT_BOOKMARKLET);
       setMessage(
-        '登録用のアドレスをコピーしました。ブックマークのURL欄に貼り付けてください。',
+        '登録用のアドレスをコピーしました。ブックマークの編集画面の「URL」欄に貼り付けてください。',
       );
     } catch {
       setShowCode(true);
@@ -52,9 +52,9 @@ export function LegacyMigrationDialog({
 
         <ol className="space-y-4">
           <li className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">1. 書き出し用のブックマークを登録</h2>
+            <h2 className="font-medium">1. 新サイトで準備（初回のみ）</h2>
             <p className="text-sm leading-6 text-[var(--muted)]">
-              パソコンでは、下のリンクをブラウザのブックマークバー（お気に入りバー）へドラッグしてください。登録は初回だけです。
+              パソコンでは、下のリンクをブックマークバー（お気に入りバー）へドラッグ（つかんで移動）して登録します。
             </p>
             {/* oxlint-disable-next-line next/no-html-link-for-pages -- This draggable anchor is replaced with a bookmarklet, not used for navigation. */}
             <a
@@ -76,15 +76,21 @@ export function LegacyMigrationDialog({
             >
               旧サイトの全デッキを書き出す
             </a>
+            <p className="text-xs leading-5 text-[var(--muted)]">
+              この画面でリンクを押しても、書き出しは始まりません。
+            </p>
             <details className="rounded-lg bg-[var(--soft)] p-3 text-sm leading-6">
               <summary className="cursor-pointer font-medium">
                 スマートフォン・ドラッグできない場合
               </summary>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-[var(--muted)]">
-                <li>このページをいったんブックマークに登録します。</li>
-                <li>下のボタンで登録用アドレスをコピーします。</li>
+                <li>このページをブックマークに登録します。</li>
+                <li>「登録用アドレスをコピー」を押します。</li>
                 <li>
-                  登録したブックマークを編集し、名前を「旧デッキ書き出し」、URLをコピーしたアドレスに置き換えて保存します。
+                  登録したブックマークの編集画面で、名前を「旧デッキ書き出し」にします。
+                </li>
+                <li>
+                  同じ編集画面の「URL」欄を、コピーした全文に置き換えて保存します。
                 </li>
               </ol>
               <Button
@@ -112,19 +118,40 @@ export function LegacyMigrationDialog({
             </details>
           </li>
           <li className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">2. 旧サイトを開いて書き出す</h2>
+            <h2 className="font-medium">2. 旧サイトで書き出す</h2>
             <p className="text-sm leading-6 text-[var(--muted)]">
-              デッキを保存している端末・ブラウザで、普段使っているブックマークや閲覧履歴から旧サイトを開いてください。旧サイトを表示したまま、書き出し用に登録したブックマークを実行すると、全デッキのJSONファイルが保存されます。
+              デッキを保存した端末・同じブラウザで行ってください。
             </p>
-            <p className="text-xs leading-5 text-[var(--muted)]">
-              スマートフォンでは、旧サイトを表示したままブックマークを選びます。Chromeで動かない場合は、アドレス欄に登録名を入力し、候補のブックマークを選んでください。
-            </p>
+            <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-[var(--muted)]">
+              <li>普段のブックマークや履歴から旧サイトを開きます。</li>
+              <li>
+                旧サイトを表示したまま、手順1で登録した書き出し用ブックマークを選びます。
+              </li>
+              <li>
+                書き出し完了のメッセージと、保存されたデータファイル（JSON）を確認します。
+              </li>
+            </ol>
+            <details className="rounded-lg bg-[var(--soft)] p-3 text-sm leading-6">
+              <summary className="cursor-pointer font-medium">
+                スマートフォンのChromeで動かない場合
+              </summary>
+              <p className="mt-2 text-[var(--muted)]">
+                旧サイトを表示したまま、ブラウザ上部のアドレス欄に「旧デッキ書き出し」と入力し、候補のブックマークを選びます。
+              </p>
+            </details>
           </li>
           <li className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">3. ファイルを選んで取り込む</h2>
-            <p className="text-sm leading-6 text-[var(--muted)]">
-              この画面に戻り、書き出したJSONファイルを選びます。内容を確認して、移したいデッキだけを取り込めます。
-            </p>
+            <h2 className="font-medium">3. 新サイトで取り込む</h2>
+            <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-[var(--muted)]">
+              <li>
+                この案内画面に戻り、下の「旧サイトのJSONファイルを選ぶ」から書き出したファイルを選びます。
+              </li>
+              <li>
+                確認画面では全件選択済みです。取り込まないデッキだけチェックを外します。
+              </li>
+              <li>「○件をインポート」を押します。</li>
+              <li>「マイデッキ」で追加されたことを確認します。</li>
+            </ol>
             <Button
               type="button"
               className="h-auto min-h-11 whitespace-normal"
