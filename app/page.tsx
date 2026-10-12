@@ -4,13 +4,11 @@ import {
   type ChangeEvent,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
 import { customCards } from '@/app/custom-cards';
 import { ijindenCards } from '@/app/ijinden-cards';
-import { regulations } from '@/data/regulations';
 import type {
   Deck,
   DeckImportParseResult,
@@ -32,7 +30,6 @@ import { Help } from '@/components/help';
 import { useDeckBook } from '@/hooks/use-deck-book';
 import { parseDeckTextImport } from '@/lib/deck-text-import';
 import { applyCardRuleMetadata } from '@/lib/deck-utils';
-import { validateDeck, validateDeckForRegulation } from '@/lib/deck-validator';
 
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'simulator' | 'help';
 
@@ -81,6 +78,8 @@ export default function Home() {
     setSelectedCardId(cardId);
   }, []);
 
+  const openRecipeTab = useCallback(() => setActiveTab('recipe'), []);
+
   useEffect(
     () => () => {
       if (noticeTimerRef.current !== null)
@@ -102,17 +101,6 @@ export default function Home() {
     deleteSavedDeck,
   } = book;
 
-  const validation = useMemo(
-    () => validateDeck(activeDeck, { cardsById }),
-    [activeDeck],
-  );
-  const regulationValidations = useMemo(
-    () =>
-      regulations.map((regulation) =>
-        validateDeckForRegulation(activeDeck, regulation, { cardsById }),
-      ),
-    [activeDeck],
-  );
   const selectedCard = selectedCardId
     ? (cardsById.get(selectedCardId) ?? null)
     : null;
@@ -392,8 +380,6 @@ export default function Home() {
                 deck={activeDeck}
                 cardsById={cardsById}
                 cardOrder={cardOrder}
-                validation={validation}
-                regulationValidations={regulationValidations}
                 notice={notice}
                 onSave={() => {
                   void book.saveActiveDeck();
@@ -417,7 +403,7 @@ export default function Home() {
               recipeName={activeDeck.name}
               main={activeDeck.main}
               cardsById={cardsById}
-              onEditRecipe={() => setActiveTab('recipe')}
+              onEditRecipe={openRecipeTab}
             />
             {activeTab === 'myDecks' && (
               <MyDecks

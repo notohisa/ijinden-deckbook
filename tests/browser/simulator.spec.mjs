@@ -71,6 +71,84 @@ test('board operations and simple-view operations share one session without chan
   expect(await stored(page)).toEqual(before);
 });
 
+test('the mounted simulator keeps its session and resets from the latest recipe', async ({
+  page,
+}) => {
+  await openRecipe(page);
+  await page.getByRole('tab', { name: 'シミュ', exact: true }).click();
+  await page.getByRole('button', { name: '盤面表示', exact: true }).click();
+  const board = page.getByRole('tabpanel', {
+    name: 'シミュレーション',
+    exact: true,
+  });
+  await board
+    .getByRole('button', { name: 'このレシピで開始', exact: true })
+    .click();
+  await board.getByRole('button', { name: '1枚引く', exact: true }).click();
+  await expect(
+    board.getByRole('button', { name: '手札 7枚', exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole('tab', { name: 'カード', exact: true }).click();
+  const catalog = page.getByRole('tabpanel', {
+    name: 'カードを探す',
+    exact: true,
+  });
+  await catalog
+    .getByRole('button', {
+      name: '直江兼続（01-011）のメインに1枚追加する',
+      exact: true,
+    })
+    .click();
+  await catalog
+    .getByRole('button', {
+      name: 'クレオパトラ（01-002）のメインから1枚減らす',
+      exact: true,
+    })
+    .click({ clickCount: 2, delay: 20 });
+  await expect(
+    catalog.getByLabel('直江兼続（01-011）のメインに入っている枚数', {
+      exact: true,
+    }),
+  ).toHaveText('1');
+  await expect(
+    catalog.getByLabel('クレオパトラ（01-002）のメインに入っている枚数', {
+      exact: true,
+    }),
+  ).toHaveText('2');
+  await expect
+    .poll(async () => (await stored(page)).draft.main['01-011'])
+    .toBe(1);
+  await expect
+    .poll(async () => (await stored(page)).draft.main['01-002'])
+    .toBe(2);
+
+  await page.getByRole('tab', { name: 'シミュ', exact: true }).click();
+  await expect(board.getByText(/^レシピが変更されています。/)).toBeVisible();
+  await expect(
+    board.getByRole('button', { name: '手札 7枚', exact: true }),
+  ).toBeVisible();
+
+  await board.getByRole('button', { name: 'やり直す', exact: true }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'やり直す', exact: true })
+    .click();
+  await expect(board.getByText('山札 29枚', { exact: true })).toBeVisible();
+  await expect(
+    board.getByRole('button', { name: '手札 6枚', exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole('tab', { name: 'レシピ', exact: true }).click();
+  const recipe = page.getByRole('tabpanel', {
+    name: 'レシピ',
+    exact: true,
+  });
+  await expect(
+    recipe.getByText('メインデッキがあと1枚必要です', { exact: true }),
+  ).toBeVisible();
+});
+
 test('board card menu and drag still move cards after extraction', async ({
   page,
 }) => {

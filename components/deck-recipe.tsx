@@ -2,21 +2,22 @@
 
 /* oxlint-disable next/no-img-element -- GitHub Pages renders official card URLs with standard images, without a Next.js image server. */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   AppCard,
   CardType,
   Deck,
   DeckValidation,
   Pile,
-  RegulationValidation,
 } from '@/app/types/deck';
+import { regulations } from '@/data/regulations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DeckStatusBadge } from '@/components/deck-status-badge';
 import { DeckShareActions } from '@/components/deck-share-actions';
 import { RegulationStatus } from '@/components/regulation-status';
 import { cardTypes, countByCardType, countCards } from '@/lib/deck-utils';
+import { validateDeck, validateDeckForRegulation } from '@/lib/deck-validator';
 
 const colorOptions = ['赤', '青', '緑', '黄', '紫', '無'] as const;
 
@@ -28,8 +29,6 @@ type Props = {
   deck: Deck;
   cardsById: ReadonlyMap<string, AppCard>;
   cardOrder: ReadonlyMap<string, number>;
-  validation: DeckValidation;
-  regulationValidations: readonly RegulationValidation[];
   notice: string;
   onSave: () => void;
   onClear: () => void;
@@ -45,8 +44,6 @@ export function DeckRecipe({
   deck,
   cardsById,
   cardOrder,
-  validation,
-  regulationValidations,
   notice,
   onSave,
   onClear,
@@ -58,6 +55,17 @@ export function DeckRecipe({
   onOpenSimulator,
 }: Props) {
   const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
+  const validation = useMemo(
+    () => validateDeck(deck, { cardsById }),
+    [deck, cardsById],
+  );
+  const regulationValidations = useMemo(
+    () =>
+      regulations.map((regulation) =>
+        validateDeckForRegulation(deck, regulation, { cardsById }),
+      ),
+    [deck, cardsById],
+  );
   const mainTypeCounts = countByCardType(deck.main, cardsById);
   const sideTypeCounts = countByCardType(deck.side, cardsById);
 

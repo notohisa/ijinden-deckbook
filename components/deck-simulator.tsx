@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import {
   DndContext,
   MouseSensor,
@@ -17,7 +18,9 @@ import {
 import type { DeckSimulatorProps } from '@/components/simulator-types';
 import { useSimulatorSession } from '@/hooks/use-simulator-session';
 
-export function DeckSimulator(props: DeckSimulatorProps) {
+export const DeckSimulator = memo(function DeckSimulator(
+  props: DeckSimulatorProps,
+) {
   const {
     mode,
     setMode,
@@ -95,5 +98,22 @@ export function DeckSimulator(props: DeckSimulatorProps) {
         onUpdateSession={updateSession}
       />
     </>
+  );
+}, areDeckSimulatorPropsEqual);
+
+function areDeckSimulatorPropsEqual(
+  previous: DeckSimulatorProps,
+  next: DeckSimulatorProps,
+): boolean {
+  if (previous.active !== next.active) return false;
+
+  // Keep the mounted session quiet while hidden; activating it renders with the latest inputs.
+  if (!previous.active) return true;
+
+  return (
+    previous.recipeName === next.recipeName &&
+    previous.main === next.main &&
+    previous.cardsById === next.cardsById &&
+    previous.onEditRecipe === next.onEditRecipe
   );
 }
