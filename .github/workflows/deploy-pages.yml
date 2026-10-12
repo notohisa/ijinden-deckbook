@@ -38,8 +38,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint, typecheck, and unit tests
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+
       - name: Build static site
         run: pnpm run build:pages
+
+      - name: Install Chromium for browser tests
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser regression tests
+        run: pnpm test:browser
+
+      - name: Upload browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-results
+          path: test-results
+          retention-days: 7
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

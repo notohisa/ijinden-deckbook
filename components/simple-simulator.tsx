@@ -1,8 +1,5 @@
 'use client';
 
-/* oxlint-disable next/no-img-element -- GitHub Pages renders official card URLs with standard images, without a Next.js image server. */
-
-import { useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,23 +11,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { SimulatorModeToggle, type SimulationViewMode } from '@/components/simulator-mode-toggle';
+import {
+  SimulatorModeToggle,
+  type SimulationViewMode,
+} from '@/components/simulator-mode-toggle';
+import { SimpleCardTile } from '@/components/simulator/simple-card-tile';
+import { SimpleZone } from '@/components/simulator/simple-zone';
 import type {
   DeckSimulatorProps,
   SimulatorSession,
 } from '@/components/simulator-types';
-import {
-  getNextSimpleCardState,
-  type SimpleCardState,
-} from '@/lib/simple-simulator';
 import type { SimulationRecipe } from '@/lib/simulator-recipe';
-import {
-  flipSimulationCard,
-  findSimulationCard,
-  isBattlefieldIjin,
-  moveSimulationCard,
-  type SimulationCard,
-} from '@/lib/simulator';
+import { useSimpleSimulator } from '@/hooks/use-simple-simulator';
 
 type Props = DeckSimulatorProps & {
   mode: SimulationViewMode;
@@ -42,24 +34,6 @@ type Props = DeckSimulatorProps & {
   onUpdateSession: (
     update: (session: SimulatorSession) => SimulatorSession,
   ) => void;
-};
-
-const stateLabels: Record<SimpleCardState, string | undefined> = {
-  normal: undefined,
-  mana: 'マリョク',
-  manaBack: 'マリョク（裏）',
-  battlefield: '戦場',
-  graveyard: '墓地',
-  equipped: '装備',
-};
-
-const nextStateMessages: Record<SimpleCardState, string> = {
-  normal: 'をマリョクにしました。',
-  mana: 'をマリョク（裏）にしました。',
-  manaBack: 'を戦場にしました。',
-  battlefield: 'を墓地にしました。',
-  graveyard: 'を装備にしました。',
-  equipped: 'を通常表示に戻しました。',
 };
 
 export function SimpleSimulator({
@@ -75,91 +49,24 @@ export function SimpleSimulator({
   onMulligan,
   onUpdateSession,
 }: Props) {
-  const [message, setMessage] = useState('');
-  const [confirmReset, setConfirmReset] = useState(false);
-
-  const recipeChanged = Boolean(
-    session && session.recipeSignature !== recipe.signature,
-  );
-  const simpleCards = session
-    ? [
-        ...session.board.zones.hand,
-        ...session.board.zones.deck,
-        ...session.board.zones.battlefield,
-        ...session.board.zones.mana,
-        ...session.board.zones.graveyard,
-      ]
-    : [];
-
-  function start() {
-    if (recipe.error) return;
-    onStart();
-    setConfirmReset(false);
-    setMessage('シャッフルして、手札6枚とガーディアン4枚を用意しました。');
-  }
-
-  function mulligan() {
-    if (!session?.canMulligan) return;
-    onMulligan();
-    setMessage('手札を引き直しました。ガーディアンは裏向きに戻しています。');
-  }
-
-  function tapCard(instance: SimulationCard) {
-    if (instance.faceDown) {
-      onUpdateSession((current) => ({
-        ...current,
-        board: flipSimulationCard(current.board, instance.instanceId),
-        canMulligan: false,
-        simpleStates: {
-          ...current.simpleStates,
-          [instance.instanceId]: 'normal',
-        },
-      }));
-      setMessage('カードを公開しました。');
-      return;
-    }
-    const card = cardsById.get(instance.cardId);
-    const currentState = session?.simpleStates[instance.instanceId] ?? 'normal';
-    onUpdateSession((current) => ({
-      ...current,
-      canMulligan: false,
-      simpleStates: {
-        ...current.simpleStates,
-        [instance.instanceId]: getNextSimpleCardState(currentState),
-      },
-    }));
-    setMessage(
-      (card?.name ?? 'カード') +
-        nextStateMessages[currentState],
-    );
-  }
-
-  function makeGuardian(instance: SimulationCard) {
-    onUpdateSession((current) => {
-      const card = findSimulationCard(current.board, instance.instanceId);
-      if (!card || card.zone === 'guardians') return current;
-      const simpleStates = { ...current.simpleStates };
-      delete simpleStates[instance.instanceId];
-      if (isBattlefieldIjin(card)) {
-        for (const attachedCard of current.board.zones.battlefield) {
-          if (attachedCard.equippedTo === instance.instanceId) {
-            delete simpleStates[attachedCard.instanceId];
-          }
-        }
-      }
-      return {
-        ...current,
-        board: moveSimulationCard(
-          current.board,
-          instance.instanceId,
-          'guardians',
-        ),
-        canMulligan: false,
-        simpleStates,
-      };
-    });
-    setMessage('カードを裏向きのガーディアンにしました。');
-  }
+  const {
+    message,
+    confirmReset,
+    setConfirmReset,
+    recipeChanged,
+    simpleCards,
+    start,
+    mulligan,
+    tapCard,
+    makeGuardian,
+  } = useSimpleSimulator({
+    cardsById,
+    session,
+    recipe,
+    onStart,
+    onMulligan,
+    onUpdateSession,
+  });
 
   return (
     <section
@@ -251,7 +158,9 @@ export function SimpleSimulator({
               </p>
             </div>
             <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-              グレーのカードは最初のタップで公開します。公開後は、通常 → マリョク → マリョク（裏） → 戦場 → 墓地 → 装備 → 通常の順に切り替わります。
+              グレーのカードは最初のタップで公開します。公開後は、通常 →
+              マリョク → マリョク（裏） → 戦場 → 墓地 → 装備 →
+              通常の順に切り替わります。
             </p>
             <output
               aria-live="polite"
@@ -272,7 +181,9 @@ export function SimpleSimulator({
                   <SimpleCardTile
                     key={instance.instanceId}
                     instance={instance}
-                    state={session.simpleStates[instance.instanceId] ?? 'normal'}
+                    state={
+                      session.simpleStates[instance.instanceId] ?? 'normal'
+                    }
                     cardName={card.name}
                     imageUrl={card.imageUrl}
                     hiddenLabel={'ガーディアン' + String(index + 1)}
@@ -291,7 +202,9 @@ export function SimpleSimulator({
                   <SimpleCardTile
                     key={instance.instanceId}
                     instance={instance}
-                    state={session.simpleStates[instance.instanceId] ?? 'normal'}
+                    state={
+                      session.simpleStates[instance.instanceId] ?? 'normal'
+                    }
                     cardName={card.name}
                     imageUrl={card.imageUrl}
                     hiddenLabel={'未公開カード' + String(index + 1)}
@@ -330,113 +243,5 @@ export function SimpleSimulator({
         </AlertDialogContent>
       </AlertDialog>
     </section>
-  );
-}
-
-function SimpleZone({
-  title,
-  count,
-  children,
-}: {
-  title: string;
-  count: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      className="rounded-2xl border border-[var(--line)] bg-white/75 p-3 sm:p-4"
-      aria-label={title}
-    >
-      <h2 className="font-display text-lg">
-        {title}{' '}
-        <span className="ml-1 font-sans text-sm text-[var(--muted)]">
-          {count}枚
-        </span>
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function SimpleCardTile({
-  instance,
-  state,
-  cardName,
-  imageUrl,
-  hiddenLabel,
-  onTap,
-  onMakeGuardian,
-}: {
-  instance: SimulationCard;
-  state: SimpleCardState;
-  cardName: string;
-  imageUrl: string;
-  hiddenLabel: string;
-  onTap: () => void;
-  onMakeGuardian?: () => void;
-}) {
-  const stateLabel = stateLabels[state];
-  const overlayClass: Record<SimpleCardState, string> = {
-    normal: '',
-    mana: 'bg-[rgb(255_0_0_/_0.45)] text-white',
-    manaBack: 'bg-[rgb(255_255_255_/_0.70)] text-[var(--ink)]',
-    battlefield: 'bg-[rgb(255_220_0_/_0.45)] text-[var(--ink)]',
-    graveyard: 'bg-[rgb(0_0_0_/_0.60)] text-white',
-    equipped: 'bg-[rgb(0_100_255_/_0.45)] text-white',
-  };
-  const name = instance.faceDown ? hiddenLabel : cardName;
-
-  return (
-    <li className="w-[80px] min-w-0 shrink-0">
-      <button
-        type="button"
-        onClick={onTap}
-        aria-label={
-          !instance.faceDown
-            ? cardName + (stateLabel ? '、' + stateLabel : '、通常') + 'を切り替える'
-            : hiddenLabel + 'を公開する'
-        }
-        className="relative block h-[112px] w-[80px] touch-manipulation overflow-hidden rounded-md border border-[var(--line)] bg-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
-      >
-        {!instance.faceDown ? (
-          <img
-            src={imageUrl}
-            alt={cardName}
-            loading="lazy"
-            className="h-full w-full object-cover object-top"
-          />
-        ) : (
-          <span className="absolute inset-0 grid place-content-center gap-1 bg-slate-500 px-1 text-center text-xs leading-5 text-white">
-            <span aria-hidden="true" className="text-xl">◆</span>
-            <span>グレー</span>
-          </span>
-        )}
-        {!instance.faceDown && stateLabel && (
-          <span
-            className={'absolute inset-0 grid place-content-center px-1 text-center text-sm font-bold drop-shadow ' + overlayClass[state]}
-          >
-            {stateLabel}
-          </span>
-        )}
-      </button>
-      <p className="mt-1 line-clamp-2 min-h-10 break-words text-sm leading-5">
-        {name}
-      </p>
-      {onMakeGuardian && (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onMakeGuardian}
-          aria-label={
-            instance.faceDown
-              ? hiddenLabel + 'を裏向きのガーディアンにする'
-              : cardName + 'を裏向きのガーディアンにする'
-          }
-          className="mt-1 h-8 w-full border-[var(--line)] bg-white px-1 text-xs!"
-        >
-          ガーディアンへ
-        </Button>
-      )}
-    </li>
   );
 }

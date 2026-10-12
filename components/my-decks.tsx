@@ -25,7 +25,7 @@ type Props = {
   cardsById: ReadonlyMap<string, AppCard>;
   onCreate: () => void;
   onOpenDeck: (deck: Deck) => void;
-  onRename: (deckId: string, name: string) => boolean;
+  onRename: (deckId: string, name: string) => Promise<boolean>;
   onSetColor: (deckId: string, color: DeckColor) => void;
   onDelete: (deckId: string) => void;
 };
@@ -99,9 +99,10 @@ export function MyDecks({
     setRenamingDeckName(deck.name);
   }
 
-  function finishRenaming() {
+  async function finishRenaming() {
     if (!renamingDeckId) return;
-    if (onRename(renamingDeckId, renamingDeckName)) setRenamingDeckId(null);
+    if (await onRename(renamingDeckId, renamingDeckName))
+      setRenamingDeckId(null);
   }
 
   return (
@@ -217,7 +218,7 @@ export function MyDecks({
                       setRenamingDeckName(event.target.value)
                     }
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') finishRenaming();
+                      if (event.key === 'Enter') void finishRenaming();
                     }}
                     className="h-10 border-[var(--line)] bg-white text-base"
                   />

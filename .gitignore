@@ -41,3 +41,7 @@ next-env.d.ts
 # local compiler / Python caches
 *.tsbuildinfo
 __pycache__/
+
+# Browser test output
+/test-results/
+/playwright-report/
