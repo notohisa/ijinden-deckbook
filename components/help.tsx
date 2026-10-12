@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 export function Help({ onLegacyMigration }: { onLegacyMigration: () => void }) {
   return (
     <section
-      className="mx-auto max-w-3xl break-words rounded-2xl border border-[var(--line)] bg-white/80 p-5 text-[15px] leading-7 shadow-[0_12px_30px_rgb(33_38_45/0.04)] sm:p-7 sm:text-base"
+      className="mx-auto max-w-3xl break-words rounded-2xl border border-[var(--line)] bg-[var(--surface)]/80 p-5 text-[15px] leading-7 shadow-[0_12px_30px_rgb(33_38_45/0.04)] sm:p-7 sm:text-base"
       role="tabpanel"
       aria-label="ヘルプ"
     >
@@ -13,6 +13,9 @@ export function Help({ onLegacyMigration }: { onLegacyMigration: () => void }) {
       </h1>
       <p className="mt-3 text-[var(--muted)]">
         デッキを作り、保存・共有や一人回しができるツールです。
+      </p>
+      <p className="mt-2 rounded-lg bg-[var(--soft)] px-3 py-2 text-sm leading-6">
+        ヘッダーの「表示テーマ」で、自動（端末の配色設定に連動）・ライト・ダークを選べます。
       </p>
 
       <div className="mt-6 space-y-8 text-[var(--muted)]">

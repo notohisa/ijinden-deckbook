@@ -18,9 +18,9 @@ export const deckColorOptions: Array<{
 ];
 
 export const deckRowColorClasses: Record<DeckColor, string> = {
-  default: 'bg-white/50 hover:bg-[var(--soft)]',
-  orange: 'bg-orange-100 hover:bg-orange-200',
-  gray: 'bg-slate-200 hover:bg-slate-300',
+  default: 'bg-[var(--surface)]/50 hover:bg-[var(--soft)]',
+  orange: 'bg-[var(--warning-bg-strong)] hover:bg-[var(--warning-bg-stronger)]',
+  gray: 'bg-[var(--mist)] hover:bg-[var(--line)]',
 };
 
 const unlimitedDeckText = 'デッキに何枚でも入れてよい';

@@ -14,12 +14,12 @@ type Props = {
 };
 
 const catalogColorTints: Record<string, string> = {
-  赤: '#f9d2ca',
-  青: '#d7e8f7',
-  緑: '#d9eddf',
-  黄: '#fff0bb',
-  紫: '#e9dcf3',
-  無: '#e8edf0',
+  赤: 'var(--catalog-tint-red)',
+  青: 'var(--catalog-tint-blue)',
+  緑: 'var(--catalog-tint-green)',
+  黄: 'var(--catalog-tint-yellow)',
+  紫: 'var(--catalog-tint-purple)',
+  無: 'var(--catalog-tint-neutral)',
 };
 
 export const CatalogCardRow = memo(function CatalogCardRow({
@@ -49,7 +49,7 @@ export const CatalogCardRow = memo(function CatalogCardRow({
     <TableRow
       className={
         'border-[var(--line)] ' +
-        (mainCount + sideCount > 0 ? 'bg-[var(--mist)]/70' : 'bg-white/70')
+        (mainCount + sideCount > 0 ? 'bg-[var(--mist)]/70' : 'bg-[var(--surface)]/70')
       }
     >
       <TableCell
@@ -103,7 +103,7 @@ function CatalogCardCounter({
   return (
     <fieldset
       aria-label={label + 'の枚数'}
-      className="grid min-w-0 grid-cols-3 overflow-hidden rounded-md border border-[var(--line)] bg-white p-0"
+      className="grid min-w-0 grid-cols-3 overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)] p-0"
     >
       <Button
         type="button"

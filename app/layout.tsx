@@ -20,7 +20,10 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ja">
+    <html lang="ja" data-theme="light" suppressHydrationWarning>
+      <head>
+        <script src="/theme-init.js" />
+      </head>
       <body>
         {children}
         <script

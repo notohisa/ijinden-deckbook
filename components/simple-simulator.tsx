@@ -75,7 +75,7 @@ export function SimpleSimulator({
       aria-label="シミュレーション・簡易表示"
       className="mx-auto max-w-5xl space-y-4"
     >
-      <div className="rounded-2xl border border-[var(--line)] bg-white/85 p-4 sm:p-5">
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]/85 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="label">SIMPLE SOLO MODE</p>
@@ -95,7 +95,7 @@ export function SimpleSimulator({
             type="button"
             disabled={Boolean(recipe.error)}
             onClick={() => (session ? setConfirmReset(true) : start())}
-            className="h-11 bg-[var(--green)] px-4 text-sm text-white hover:bg-[var(--green)]/85"
+            className="h-11 bg-[var(--green-solid)] px-4 text-sm text-white hover:bg-[var(--green-solid)]/85"
           >
             {session ? 'リセット' : 'このレシピで開始'}
           </Button>
@@ -115,7 +115,7 @@ export function SimpleSimulator({
           {session?.recipeName ?? (recipeName.trim() || '名前のないデッキ')}
         </p>
         {recipeChanged && (
-          <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+          <p className="mt-3 rounded-lg border border-[var(--warning-line-strong)] bg-[var(--warning-bg)] p-3 text-sm leading-6 text-[var(--warning-foreground)]">
             レシピが変更されています。今のシミュレーションは開始時の内容を使っています。「リセット」で最新のレシピを読み込みます。
           </p>
         )}
@@ -141,7 +141,7 @@ export function SimpleSimulator({
                 variant="outline"
                 onClick={mulligan}
                 disabled={!session.canMulligan}
-                className="h-11 border-[var(--line)] bg-white px-3 text-sm"
+                className="h-11 border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
               >
                 マリガン（1回）
               </Button>

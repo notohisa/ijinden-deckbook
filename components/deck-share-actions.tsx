@@ -65,7 +65,7 @@ export function DeckShareActions({
         <Button
           type="button"
           variant="outline"
-          className="h-11 border-[var(--line)] bg-white"
+          className="h-11 border-[var(--line)] bg-[var(--surface)]"
           disabled={copying}
           onClick={() => void copy('link')}
         >
@@ -74,7 +74,7 @@ export function DeckShareActions({
         <Button
           type="button"
           variant="outline"
-          className="h-11 border-[var(--line)] bg-white"
+          className="h-11 border-[var(--line)] bg-[var(--surface)]"
           disabled={copying}
           onClick={() => void copy('text')}
         >
@@ -98,7 +98,7 @@ export function DeckShareActions({
           if (!open) setManualCopy(null);
         }}
       >
-        <DialogContent className="bg-[#f8f5ee] sm:max-w-xl">
+        <DialogContent className="bg-[var(--paper)] sm:max-w-xl">
           <DialogHeader className="pr-8">
             <DialogTitle>{manualCopy?.title}をコピー</DialogTitle>
             <DialogDescription>
@@ -110,7 +110,7 @@ export function DeckShareActions({
             readOnly
             value={manualCopy?.value ?? ''}
             onFocus={(event) => event.currentTarget.select()}
-            className="h-56 w-full rounded-lg border border-[var(--line)] bg-white p-3 text-base"
+            className="h-56 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-base"
           />
           <DialogFooter>
             <Button

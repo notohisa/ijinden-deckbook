@@ -83,7 +83,7 @@ export function ZonePanel({
     <section
       ref={setNodeRef}
       className={
-        'rounded-2xl border bg-white/75 p-3 sm:p-4 ' +
+        'rounded-2xl border bg-[var(--surface)]/75 p-3 sm:p-4 ' +
         (isOver
           ? 'border-[var(--green)] ring-2 ring-[var(--green)]/30'
           : canDrop
