@@ -52,7 +52,7 @@ test('migration guide exposes a registerable bookmark and mobile instructions fr
   await expect(guide).toBeVisible();
 });
 
-test('built bookmark exports readonly legacy data and the file migrates safely with repeat protection', async ({
+test('built bookmark exports legacy Date timestamps and the file migrates safely with repeat protection', async ({
   page,
   context,
 }) => {
@@ -65,7 +65,7 @@ test('built bookmark exports readonly legacy data and the file migrates safely w
     {
       id: 1,
       title: '同じ構成',
-      timestamp: 1750000000000,
+      timestamp: '2025-06-15T15:06:40.000Z',
       main: Object.entries(original.main).map(([id, count]) => [
         '1-' + Number(id.split('-')[1]),
         count,
@@ -75,21 +75,21 @@ test('built bookmark exports readonly legacy data and the file migrates safely w
     {
       id: 2,
       title: original.name,
-      timestamp: 1750000001000,
+      timestamp: '2025-06-15T15:06:41.000Z',
       main: [['2nd1-2', 4]],
       side: [['2nd2-48', 2]],
     },
     {
       id: 3,
       title: 'サイドあり',
-      timestamp: 1750000002000,
+      timestamp: '2025-06-15T15:06:42.000Z',
       main: [['2-5', 4]],
       side: [['R-1', 1]],
     },
     {
       id: 4,
       title: '未対応カード',
-      timestamp: 1750000003000,
+      timestamp: '2025-06-15T15:06:43.000Z',
       main: [['unknown-1', 1]],
       side: [],
     },
@@ -114,8 +114,13 @@ test('built bookmark exports readonly legacy data and the file migrates safely w
         request.onsuccess = () => {
           const db = request.result;
           const transaction = db.transaction('decks', 'readwrite');
+          // The original site's save handler writes a Date object to IndexedDB.
+          // Its JSON export serializes that Date as an ISO string, not a number.
           records.forEach((record) =>
-            transaction.objectStore('decks').put(record),
+            transaction.objectStore('decks').put({
+              ...record,
+              timestamp: new Date(record.timestamp),
+            }),
           );
           transaction.oncomplete = () => {
             db.close();
@@ -152,13 +157,21 @@ test('built bookmark exports readonly legacy data and the file migrates safely w
             .getAll();
           read.onsuccess = () => {
             db.close();
-            resolve(read.result);
+            resolve({
+              timestampsAreDates: read.result.every(
+                (record) => record.timestamp instanceof Date,
+              ),
+              rows: read.result.map((record) => ({
+                ...record,
+                timestamp: record.timestamp.toISOString(),
+              })),
+            });
           };
           read.onerror = () => reject(read.error);
         };
       }),
   );
-  expect(afterExport).toEqual(raw);
+  expect(afterExport).toEqual({ timestampsAreDates: true, rows: raw });
   await legacy.close();
 
   const chooserPromise = page.waitForEvent('filechooser');

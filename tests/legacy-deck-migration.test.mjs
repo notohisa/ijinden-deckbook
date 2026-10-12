@@ -8,6 +8,7 @@ import {
 } from '../lib/legacy-deck-migration.ts';
 
 const exportedAt = '2026-10-12T03:00:00.000Z';
+const legacyTimestamp = '2025-01-01T06:19:40.443Z';
 const knownCardIds = new Set([
   '01-001',
   '02-001',
@@ -25,7 +26,7 @@ function legacyDeck(
   title,
   main = [['1-1', 1]],
   side = [],
-  timestamp = 1_781_189_200_000,
+  timestamp = legacyTimestamp,
 ) {
   return { id, title, timestamp, main, side };
 }
@@ -85,13 +86,54 @@ test('旧カードIDのセット番号を新形式に変換し timestamp を保�
   assert.deepEqual(result.decks[1].main, { '05-001': 5 });
   assert.deepEqual(result.decks[2].main, { '06-001': 6 });
   assert.deepEqual(result.decks[3].main, { 'R-001': 1 });
-  assert.equal(
-    result.decks[0].updatedAt,
-    new Date(1_781_189_200_000).toISOString(),
-  );
+  assert.equal(result.decks[0].updatedAt, legacyTimestamp);
   assert.ok(result.decks.every((deck) => deck.isSaved));
   assert.equal(new Set(result.decks.map((deck) => deck.id)).size, 4);
   assert.ok(result.decks.every((deck) => deck.id !== '1' && deck.id !== '2'));
+});
+
+test('旧DB DateをJSON化したISO timestampを保持する', () => {
+  const source = JSON.parse(
+    JSON.stringify({
+      version: 1,
+      type: LEGACY_BACKUP_TYPE,
+      exportedAt: new Date(exportedAt),
+      decks: [
+        {
+          ...legacyDeck(40, 'Date型の保存デッキ'),
+          timestamp: new Date(legacyTimestamp),
+        },
+      ],
+    }),
+  );
+  const result = parseLegacyDeckImport(source, knownCardIds, []);
+
+  assert.equal(result.invalidDecks.length, 0);
+  assert.equal(result.decks.length, 1);
+  assert.equal(result.decks[0].updatedAt, legacyTimestamp);
+});
+
+test('数値timestampも維持し、不正なISO timestampはデッキ全体をinvalidにする', () => {
+  const numericTimestamp = 1_781_189_200_000;
+  const result = parseLegacyDeckImport(
+    backup([
+      legacyDeck(41, '数値timestamp', undefined, undefined, numericTimestamp),
+      legacyDeck(42, '不正ISO', undefined, undefined, 'not-a-timestamp'),
+    ]),
+    knownCardIds,
+    [],
+  );
+
+  assert.equal(result.totalCount, 2);
+  assert.equal(result.decks.length, 1);
+  assert.equal(
+    result.decks[0].updatedAt,
+    new Date(numericTimestamp).toISOString(),
+  );
+  assert.deepEqual(
+    result.invalidDecks.map(({ name }) => name),
+    ['不正ISO'],
+  );
 });
 
 test('同名デッキには旧ID suffix を付け、既存とファイル内の同一内容は省略する', () => {

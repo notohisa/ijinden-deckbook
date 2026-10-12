@@ -11,7 +11,7 @@ export const LEGACY_BACKUP_TYPE = 'ijinden-deck-builder-backup';
 type LegacyDeck = {
   id: number;
   title?: string;
-  timestamp: number;
+  timestamp: number | string;
   main: Array<[string, number]>;
   side: Array<[string, number]>;
 };
@@ -33,6 +33,13 @@ function isCanonicalIsoTimestamp(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   const date = new Date(value);
   return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+}
+
+function isValidLegacyTimestamp(value: unknown): value is number | string {
+  return (
+    (typeof value === 'number' && Number.isFinite(value)) ||
+    isCanonicalIsoTimestamp(value)
+  );
 }
 
 /** Identifies a supported v1 export wrapper; deck rows are checked separately. */
@@ -107,7 +114,8 @@ function parsePile(
   return migrated;
 }
 
-function createUpdatedAt(timestamp: number): string {
+function createUpdatedAt(timestamp: number | string): string {
+  if (typeof timestamp === 'string') return timestamp;
   const date = new Date(timestamp);
   return Number.isNaN(date.getTime())
     ? new Date().toISOString()
@@ -124,8 +132,7 @@ function parseLegacyDeck(
   if (
     !Number.isSafeInteger(legacy.id) ||
     (legacy.id as number) <= 0 ||
-    typeof legacy.timestamp !== 'number' ||
-    !Number.isFinite(legacy.timestamp) ||
+    !isValidLegacyTimestamp(legacy.timestamp) ||
     ('title' in value && typeof legacy.title !== 'string')
   ) {
     return null;
