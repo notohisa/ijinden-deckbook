@@ -1,6 +1,13 @@
 'use client';
 
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { customCards } from '@/app/custom-cards';
 import { ijindenCards } from '@/app/ijinden-cards';
 import { regulations } from '@/data/regulations';
@@ -53,7 +60,7 @@ export default function Home() {
   const [importSourceOpen, setImportSourceOpen] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
-  function showNotice(message: string) {
+  const showNotice = useCallback((message: string) => {
     setNotice(message);
     setToast(message);
     if (noticeTimerRef.current !== null)
@@ -62,17 +69,17 @@ export default function Home() {
       setToast(null);
       noticeTimerRef.current = null;
     }, 4500);
-  }
+  }, []);
 
   function openDeckCard(cardId: string, orderedCardIds: readonly string[]) {
     setSelectedDeckCardIds(orderedCardIds);
     setSelectedCardId(cardId);
   }
 
-  function openCatalogCard(cardId: string) {
+  const openCatalogCard = useCallback((cardId: string) => {
     setSelectedDeckCardIds(null);
     setSelectedCardId(cardId);
-  }
+  }, []);
 
   useEffect(
     () => () => {

@@ -1,6 +1,12 @@
 'use client';
 
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import type { Deck, DeckColor, Pile } from '@/app/types/deck';
 import {
   createArchiveRepository,
@@ -84,7 +90,7 @@ export function useDeckBook(notify: (message: string) => void) {
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const mounted = useRef(false);
 
-  function checkpoint() {
+  const checkpoint = useCallback(() => {
     try {
       sessionStorage.setItem(
         TAB_DRAFT_KEY,
@@ -97,73 +103,85 @@ export function useDeckBook(notify: (message: string) => void) {
     } catch {
       // Shared persistence still works when optional per-tab recovery is unavailable.
     }
-  }
+  }, []);
 
-  function receive(snapshot: ReadyArchive) {
-    setArchiveLoad(snapshot);
-    setDecks(snapshot.decks);
-    const nextKey = draftKey(snapshot.draft);
-    if (nextKey === baseline.current) return;
-    if (!touched.current || nextKey === draftKey(draft.current)) {
-      baseline.current = nextKey;
-      conflict.current = false;
-      setDraftConflict(false);
-      if (snapshot.draft) {
-        draft.current = snapshot.draft;
-        setActiveDeck(snapshot.draft);
-      }
-    } else {
-      conflict.current = true;
-      setDraftConflict(true);
-    }
-    checkpoint();
-  }
-
-  function failed(error: unknown) {
-    if (error instanceof ArchiveReadError) setArchiveLoad(error.snapshot);
-    if (error instanceof SavedDecksChangedError) receive(error.snapshot);
-    const message =
-      error instanceof Error ? error.message : '保存できませんでした。';
-    setStorageIssue(message);
-    notify(message);
-  }
-
-  function enqueue<T>(
-    operation: (repo: ArchiveRepository) => Promise<T>,
-  ): Promise<T | undefined> {
-    setPendingWrites((count) => count + 1);
-    const next = queue.current.then(async () => {
-      if (!mounted.current || !repository.current) return undefined;
-      try {
-        return await operation(repository.current);
-      } catch (error) {
-        failed(error);
-        return undefined;
-      } finally {
-        if (mounted.current) setPendingWrites((count) => count - 1);
-      }
-    });
-    queue.current = next;
-    return next;
-  }
-
-  function persistDraft(proposed: Deck) {
-    void enqueue(async (repo) => {
-      if (conflict.current) return;
-      const result = await repo.changeDraft(baseline.current, proposed);
-      if (result.conflict) {
+  const receive = useCallback(
+    (snapshot: ReadyArchive) => {
+      setArchiveLoad(snapshot);
+      setDecks(snapshot.decks);
+      const nextKey = draftKey(snapshot.draft);
+      if (nextKey === baseline.current) return;
+      if (!touched.current || nextKey === draftKey(draft.current)) {
+        baseline.current = nextKey;
+        conflict.current = false;
+        setDraftConflict(false);
+        if (snapshot.draft) {
+          draft.current = snapshot.draft;
+          setActiveDeck(snapshot.draft);
+        }
+      } else {
         conflict.current = true;
         setDraftConflict(true);
-        setDecks(result.snapshot.decks);
-      } else {
-        baseline.current = draftKey(result.snapshot.draft);
-        setArchiveLoad(result.snapshot);
-        setDecks(result.snapshot.decks);
-        setStorageIssue('');
       }
       checkpoint();
-    });
-  }
+    },
+    [checkpoint],
+  );
+
+  const failed = useCallback(
+    (error: unknown) => {
+      if (error instanceof ArchiveReadError) setArchiveLoad(error.snapshot);
+      if (error instanceof SavedDecksChangedError) receive(error.snapshot);
+      const message =
+        error instanceof Error ? error.message : '保存できませんでした。';
+      setStorageIssue(message);
+      notify(message);
+    },
+    [notify, receive],
+  );
+
+  const enqueue = useCallback(
+    <T>(
+      operation: (repo: ArchiveRepository) => Promise<T>,
+    ): Promise<T | undefined> => {
+      setPendingWrites((count) => count + 1);
+      const next = queue.current.then(async () => {
+        if (!mounted.current || !repository.current) return undefined;
+        try {
+          return await operation(repository.current);
+        } catch (error) {
+          failed(error);
+          return undefined;
+        } finally {
+          if (mounted.current) setPendingWrites((count) => count - 1);
+        }
+      });
+      queue.current = next;
+      return next;
+    },
+    [failed],
+  );
+
+  const persistDraft = useCallback(
+    (proposed: Deck) => {
+      void enqueue(async (repo) => {
+        if (conflict.current) return;
+        const result = await repo.changeDraft(baseline.current, proposed);
+        if (result.conflict) {
+          conflict.current = true;
+          setDraftConflict(true);
+          setDecks(result.snapshot.decks);
+        } else {
+          baseline.current = draftKey(result.snapshot.draft);
+          setArchiveLoad(result.snapshot);
+          setDecks(result.snapshot.decks);
+          setStorageIssue('');
+        }
+        checkpoint();
+      });
+    },
+    [checkpoint, enqueue],
+  );
 
   /* oxlint-disable react/react-compiler -- Synchronize the external browser archive and tab recovery store with React state. */
   const connect = useEffectEvent(() => {
@@ -242,14 +260,23 @@ export function useDeckBook(notify: (message: string) => void) {
   useEffect(() => connect(), []);
   /* oxlint-enable react/react-compiler */
 
-  function updateActiveDeck(change: (deck: Deck) => Deck) {
-    if (archiveLoad?.status !== 'ready') return;
-    draft.current = editDraft(draft.current, change);
-    touched.current = true;
-    setActiveDeck(draft.current);
-    checkpoint();
-    persistDraft(draft.current);
-  }
+  const updateActiveDeck = useCallback(
+    (change: (deck: Deck) => Deck) => {
+      if (archiveLoad?.status !== 'ready') return;
+      draft.current = editDraft(draft.current, change);
+      touched.current = true;
+      setActiveDeck(draft.current);
+      checkpoint();
+      persistDraft(draft.current);
+    },
+    [archiveLoad?.status, checkpoint, persistDraft],
+  );
+
+  const adjustCard = useCallback(
+    (id: string, pile: Pile, difference: number) =>
+      updateActiveDeck((deck) => adjustDraftCard(deck, id, pile, difference)),
+    [updateActiveDeck],
+  );
 
   async function changeDecks<T>(
     change: (current: Deck[]) => { decks: Deck[]; value: T },
@@ -343,8 +370,7 @@ export function useDeckBook(notify: (message: string) => void) {
     deleteSavedDeck,
     importSelectedDecks,
     loadLatestDraft,
-    adjustCard: (id: string, pile: Pile, difference: number) =>
-      updateActiveDeck((deck) => adjustDraftCard(deck, id, pile, difference)),
+    adjustCard,
     moveCard: (id: string, from: Pile) =>
       updateActiveDeck((deck) => moveDraftCard(deck, id, from)),
     clearActiveDeck: () =>
