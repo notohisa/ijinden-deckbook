@@ -56,8 +56,9 @@ export function LegacyMigrationDialog({
             <p className="text-sm leading-6 text-[var(--muted)]">
               パソコンでは、下のリンクをブラウザのブックマークバー（お気に入りバー）へドラッグしてください。登録は初回だけです。
             </p>
+            {/* oxlint-disable-next-line next/no-html-link-for-pages -- This draggable anchor is replaced with a bookmarklet, not used for navigation. */}
             <a
-              href="https://sweetpotato.github.io/ijinden-deck-builder/"
+              href="./"
               // This intentional, self-contained bookmarklet runs only on the
               // legacy origin. Setting the attribute avoids React's javascript:
               // URL replacement; clicking here never executes the exporter.
@@ -113,16 +114,8 @@ export function LegacyMigrationDialog({
           <li className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
             <h2 className="font-medium">2. 旧サイトを開いて書き出す</h2>
             <p className="text-sm leading-6 text-[var(--muted)]">
-              デッキを保存している端末・ブラウザで旧サイトを開き、登録したブックマークを実行します。全デッキのJSONファイルが保存されます。
+              デッキを保存している端末・ブラウザで、普段使っているブックマークや閲覧履歴から旧サイトを開いてください。旧サイトを表示したまま、書き出し用に登録したブックマークを実行すると、全デッキのJSONファイルが保存されます。
             </p>
-            <a
-              href="https://sweetpotato.github.io/ijinden-deck-builder/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center text-[var(--red)] underline underline-offset-4"
-            >
-              旧サイトを開く ↗
-            </a>
             <p className="text-xs leading-5 text-[var(--muted)]">
               スマートフォンでは、旧サイトを表示したままブックマークを選びます。Chromeで動かない場合は、アドレス欄に登録名を入力し、候補のブックマークを選んでください。
             </p>
