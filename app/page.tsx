@@ -33,6 +33,7 @@ import {
 } from '@/lib/legacy-deck-migration';
 import { Help } from '@/components/help';
 import { useDeckBook } from '@/hooks/use-deck-book';
+import { useTheme } from '@/hooks/use-theme';
 import { parseDeckTextImport } from '@/lib/deck-text-import';
 import { applyCardRuleMetadata } from '@/lib/deck-utils';
 
@@ -56,6 +57,8 @@ export default function Home() {
     readonly string[] | null
   >(null);
   const [activeTab, setActiveTab] = useState<AppTab>('cards');
+  const { preference: themePreference, setPreference: setThemePreference } =
+    useTheme();
   const [notice, setNotice] = useState(
     'カードを追加して、あなたの最初のデッキを作りましょう。',
   );
@@ -235,7 +238,7 @@ export default function Home() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--paper)] text-[var(--ink)]">
       <div className="page-grain" aria-hidden="true" />
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[#f4f0e7]/95 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1480px] items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--ink)] text-lg text-[var(--paper)] shadow-[3px_3px_0_var(--red)]">
@@ -262,24 +265,46 @@ export default function Home() {
             <Button
               variant="outline"
               size="sm"
-              className="border-[var(--line)] bg-white/70 max-[419px]:px-1.5"
+              className="border-[var(--line)] bg-[var(--surface)]/70 max-[519px]:px-1.5"
               onClick={exportMyDecks}
               aria-label="マイデッキをエクスポート"
               disabled={archiveLoad?.status !== 'ready'}
             >
-              <span className="min-[420px]:hidden">↓</span>
-              <span className="hidden min-[420px]:inline">↓ エクスポート</span>
+              <span className="min-[520px]:hidden">↓</span>
+              <span className="hidden min-[520px]:inline">↓ エクスポート</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="border-[var(--line)] bg-white/70 max-[419px]:px-1.5"
+              className="border-[var(--line)] bg-[var(--surface)]/70 max-[519px]:px-1.5"
               onClick={() => setImportSourceOpen(true)}
               aria-label="マイデッキをインポート"
               disabled={archiveLoad?.status !== 'ready'}
             >
-              ↑ インポート
+              <span className="min-[520px]:hidden">↑</span>
+              <span className="hidden min-[520px]:inline">↑ インポート</span>
             </Button>
+            <label className="flex shrink-0 items-center gap-1.5 text-xs text-[var(--muted)]">
+              <span className="hidden min-[520px]:inline">表示</span>
+              <select
+                aria-label="表示テーマ"
+                aria-describedby="theme-selection-help"
+                className="h-9 w-[5.25rem] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-1 text-xs text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                value={themePreference}
+                onChange={(event) =>
+                  setThemePreference(
+                    event.target.value as 'system' | 'light' | 'dark',
+                  )
+                }
+              >
+                <option value="system">自動</option>
+                <option value="light">ライト</option>
+                <option value="dark">ダーク</option>
+              </select>
+              <span id="theme-selection-help" className="sr-only">
+                自動は端末の配色設定に合わせます。
+              </span>
+            </label>
           </div>
         </div>
         <nav
@@ -330,7 +355,7 @@ export default function Home() {
           <section
             role="alert"
             aria-labelledby="storage-recovery-title"
-            className="mx-auto max-w-2xl space-y-4 rounded-2xl border border-[var(--red)] bg-white/80 p-5 text-base leading-7 sm:p-7"
+            className="mx-auto max-w-2xl space-y-4 rounded-2xl border border-[var(--red)] bg-[var(--surface)]/80 p-5 text-base leading-7 sm:p-7"
           >
             <h1
               id="storage-recovery-title"
@@ -373,7 +398,7 @@ export default function Home() {
             {book.storageIssue && (
               <p
                 role="alert"
-                className="mb-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900"
+                className="mb-4 rounded-xl border border-[var(--danger-line-strong)] bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger-foreground)]"
               >
                 {book.storageIssue}
               </p>
@@ -382,7 +407,7 @@ export default function Home() {
               <section
                 role="alert"
                 aria-label="他のタブとの編集の競合"
-                className="mb-4 space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm"
+                className="mb-4 space-y-3 rounded-xl border border-[var(--warning-line-strong)] bg-[var(--warning-bg)] p-4 text-sm"
               >
                 <p>
                   別のタブでレシピが更新されました。このタブの内容は保持していますが、自動保存を止めています。
@@ -465,7 +490,7 @@ export default function Home() {
       </div>
       {toast && (
         <div
-          className="fixed inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-[60] mx-auto flex max-w-lg items-start gap-2 rounded-xl border border-[var(--green)] bg-white px-3 py-3 text-sm leading-5 text-[var(--ink)] shadow-lg"
+          className="fixed inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-[60] mx-auto flex max-w-lg items-start gap-2 rounded-xl border border-[var(--green)] bg-[var(--surface)] px-3 py-3 text-sm leading-5 text-[var(--ink)] shadow-lg"
           aria-live="polite"
         >
           <span className="mt-0.5 text-[var(--green)]" aria-hidden="true">

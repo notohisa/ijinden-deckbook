@@ -40,7 +40,7 @@ export function LegacyMigrationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[#f8f5ee] sm:max-w-xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[var(--paper)] sm:max-w-xl">
         <DialogHeader className="pr-8">
           <DialogTitle className="font-display text-xl">
             旧サイトからまとめて移行
@@ -51,7 +51,7 @@ export function LegacyMigrationDialog({
         </DialogHeader>
 
         <ol className="space-y-4">
-          <li className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
+          <li className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
             <h2 className="font-medium">1. 新サイトで準備（初回のみ）</h2>
             <p className="text-sm leading-6 text-[var(--muted)]">
               パソコンでは、下のリンクをブックマークバー（お気に入りバー）へドラッグ（つかんで移動）して登録します。
@@ -72,7 +72,7 @@ export function LegacyMigrationDialog({
                   'このリンクをブックマークバーへドラッグして登録してください。スマートフォンでは下の登録手順を開いてください。',
                 );
               }}
-              className="inline-flex min-h-11 items-center rounded-lg border border-dashed border-[var(--green)] bg-emerald-50 px-4 py-2 font-medium text-emerald-950 underline underline-offset-4"
+              className="inline-flex min-h-11 items-center rounded-lg border border-dashed border-[var(--green)] bg-[var(--success-bg)] px-4 py-2 font-medium text-[var(--success-foreground)] underline underline-offset-4"
             >
               旧サイトの全デッキを書き出す
             </a>
@@ -108,7 +108,7 @@ export function LegacyMigrationDialog({
                     readOnly
                     value={LEGACY_EXPORT_BOOKMARKLET}
                     onFocus={(event) => event.currentTarget.select()}
-                    className="mt-1 h-24 w-full break-all rounded border bg-white p-2 text-xs"
+                    className="mt-1 h-24 w-full break-all rounded border bg-[var(--surface)] p-2 text-xs"
                   />
                 </label>
               )}
@@ -117,7 +117,7 @@ export function LegacyMigrationDialog({
               </p>
             </details>
           </li>
-          <li className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
+          <li className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
             <h2 className="font-medium">2. 旧サイトで書き出す</h2>
             <p className="text-sm leading-6 text-[var(--muted)]">
               デッキを保存した端末・同じブラウザで行ってください。
@@ -140,7 +140,7 @@ export function LegacyMigrationDialog({
               </p>
             </details>
           </li>
-          <li className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-4">
+          <li className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
             <h2 className="font-medium">3. 新サイトで取り込む</h2>
             <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-[var(--muted)]">
               <li>

@@ -8,7 +8,7 @@ type Props = {
 export function RegulationStatus({ validations }: Props) {
   return (
     <section
-      className="mt-3 rounded-xl border border-[var(--line)] bg-white px-3 py-3"
+      className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-3"
       aria-label="レギュレーション"
     >
       <h2 className="font-display text-lg">レギュレーション</h2>

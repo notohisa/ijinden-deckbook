@@ -95,7 +95,7 @@ export function SimpleCardTile({
               ? hiddenLabel + 'を裏向きのガーディアンにする'
               : cardName + 'を裏向きのガーディアンにする'
           }
-          className="mt-1 h-8 w-full border-[var(--line)] bg-white px-1 text-xs!"
+          className="mt-1 h-8 w-full border-[var(--line)] bg-[var(--surface)] px-1 text-xs!"
         >
           ガーディアンへ
         </Button>

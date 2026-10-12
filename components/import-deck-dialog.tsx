@@ -62,7 +62,7 @@ export function ImportDeckDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[#f8f5ee] sm:max-w-xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[var(--paper)] sm:max-w-xl">
         <DialogHeader className="pr-8">
           <DialogTitle className="font-display text-xl">
             マイデッキをインポート
@@ -73,7 +73,7 @@ export function ImportDeckDialog({
           </DialogDescription>
         </DialogHeader>
         {legacySummary && (
-          <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-950">
+          <div className="space-y-1 rounded-lg border border-[var(--success-line)] bg-[var(--success-bg)] p-3 text-sm leading-6 text-[var(--success-foreground)]">
             <p className="font-medium">旧サイトのデッキを確認しました</p>
             <p>
               取り込み候補 {items.length}件・同じ内容で省略{' '}
@@ -90,7 +90,7 @@ export function ImportDeckDialog({
           </div>
         )}
         {invalidDecks.length > 0 && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+          <div className="rounded-lg border border-[var(--warning-line-strong)] bg-[var(--warning-bg)] p-3 text-sm leading-6 text-[var(--warning-foreground)]">
             <p className="font-medium">
               {invalidDecks.length}件は読み込めませんでした。
             </p>
@@ -140,8 +140,8 @@ export function ImportDeckDialog({
                     className={
                       'rounded-xl border p-3 transition ' +
                       (item.action === 'update'
-                        ? 'border-amber-300 bg-amber-50/60'
-                        : 'border-[var(--line)] bg-white')
+                        ? 'border-[var(--warning-line-strong)] bg-[var(--warning-bg)]/60'
+                        : 'border-[var(--line)] bg-[var(--surface)]')
                     }
                   >
                     <label className="flex cursor-pointer items-start gap-3">
@@ -161,8 +161,8 @@ export function ImportDeckDialog({
                           <span
                             className={
                               item.action === 'update'
-                                ? 'rounded-full bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-950'
-                                : 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900'
+                                ? 'rounded-full bg-[var(--warning-bg-stronger)] px-2 py-0.5 text-xs font-medium text-[var(--warning-foreground)]'
+                                : 'rounded-full bg-[var(--success-bg-strong)] px-2 py-0.5 text-xs font-medium text-[var(--success-foreground)]'
                             }
                           >
                             {item.action === 'update' ? '↻ 更新' : '＋ 新規'}
@@ -174,7 +174,7 @@ export function ImportDeckDialog({
                           {validation.sideCount}枚
                         </span>
                         {item.action === 'update' && (
-                          <span className="mt-1 block text-xs leading-5 text-amber-950">
+                          <span className="mt-1 block text-xs leading-5 text-[var(--warning-foreground)]">
                             ⚠ この端末の既存デッキを更新します
                             {item.existingDeck &&
                             formatUpdatedAt(item.existingDeck.updatedAt)

@@ -71,7 +71,7 @@ export function IncomingDeckShare({
         if (!open) close();
       }}
     >
-      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[#f8f5ee] sm:max-w-2xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[var(--paper)] sm:max-w-2xl">
         <DialogHeader className="pr-8">
           <DialogTitle className="font-display text-xl">
             {deck ? '共有されたデッキ' : '共有リンクを読み込めませんでした'}
@@ -85,7 +85,7 @@ export function IncomingDeckShare({
         {error && (
           <p
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900"
+            className="rounded-lg border border-[var(--danger-line)] bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger-foreground)]"
           >
             {error}
           </p>
@@ -112,7 +112,7 @@ export function IncomingDeckShare({
                       {entries.map((card) => (
                         <li
                           key={card.id}
-                          className="min-w-0 rounded-lg border border-[var(--line)] bg-white p-1.5"
+                          className="min-w-0 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-1.5"
                         >
                           <img
                             src={card.imageUrl}
@@ -134,7 +134,7 @@ export function IncomingDeckShare({
               );
             })}
             {!canImport && (
-              <p className="text-sm text-amber-950">
+              <p className="text-sm text-[var(--warning-foreground)]">
                 この端末の保存データを確認できるまで、取り込みはできません。
               </p>
             )}

@@ -270,7 +270,7 @@ export const CardCatalog = memo(function CardCatalog({
 
   return (
     <section
-      className="rounded-2xl border border-[var(--line)] bg-white/70 p-3 shadow-[0_12px_30px_rgb(33_38_45/0.04)] sm:p-4"
+      className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]/70 p-3 shadow-[0_12px_30px_rgb(33_38_45/0.04)] sm:p-4"
       role="tabpanel"
       aria-label="カードを探す"
     >
@@ -318,16 +318,16 @@ export const CardCatalog = memo(function CardCatalog({
             }
           }}
           placeholder="名前・能力文・特性・カード番号で検索"
-          className="h-10 w-full rounded-lg border border-[var(--line)] bg-white py-1 pr-2 pl-9 text-base outline-none placeholder:text-[var(--muted)] focus-visible:border-[var(--ring)] focus-visible:ring-3 focus-visible:ring-[var(--ring)]/50 md:text-sm"
+          className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] py-1 pr-2 pl-9 text-base outline-none placeholder:text-[var(--muted)] focus-visible:border-[var(--ring)] focus-visible:ring-3 focus-visible:ring-[var(--ring)]/50 md:text-sm"
         />
       </div>
-      <details className="mb-3 rounded-xl border border-[var(--line)] bg-white/80">
+      <details className="mb-3 rounded-xl border border-[var(--line)] bg-[var(--surface)]/80">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium marker:content-none">
           <span>⌘ 条件で絞り込む</span>
           <span
             className={
               activeFilterCount > 0
-                ? 'rounded-full bg-[var(--red)] px-2 py-0.5 text-[10px] text-white'
+                ? 'rounded-full bg-[var(--red-solid)] px-2 py-0.5 text-[10px] text-white'
                 : 'rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] text-[var(--muted)]'
             }
           >
@@ -474,7 +474,7 @@ export const CardCatalog = memo(function CardCatalog({
                 id="card-sort"
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value as SortBy)}
-                className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-white px-2 text-xs"
+                className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-2 text-xs"
               >
                 {sortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -496,7 +496,7 @@ export const CardCatalog = memo(function CardCatalog({
                 onChange={(event) =>
                   setSortDirection(event.target.value as SortDirection)
                 }
-                className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-white px-2 text-xs"
+                className="mt-1 h-8 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-2 text-xs"
               >
                 {sortDirectionOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -590,8 +590,8 @@ function FilterPill({
       onClick={onClick}
       className={
         active
-          ? 'border-[var(--ink)] bg-[var(--ink)] !text-white hover:bg-[var(--ink)]/85 hover:!text-white'
-          : 'border-[var(--line)] bg-white text-[var(--ink)]'
+          ? 'border-[var(--ink)] bg-[var(--ink)] !text-[var(--paper)] hover:bg-[var(--ink)]/85 hover:!text-[var(--paper)]'
+          : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]'
       }
     >
       {label}
@@ -618,7 +618,7 @@ function CollapsibleFilterGroup({
         <span
           className={
             selectedCount > 0
-              ? 'rounded-full bg-[var(--red)] px-1.5 py-0.5 text-[10px] text-white'
+              ? 'rounded-full bg-[var(--red-solid)] px-1.5 py-0.5 text-[10px] text-white'
               : 'text-[var(--muted)]'
           }
         >

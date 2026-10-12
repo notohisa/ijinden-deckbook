@@ -144,7 +144,7 @@ export function BoardView(props: BoardViewProps) {
       aria-label="シミュレーション"
       className="mx-auto max-w-5xl space-y-4"
     >
-      <div className="rounded-2xl border border-[var(--line)] bg-white/85 p-4 sm:p-5">
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]/85 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="label">BOARD SOLO MODE</p>
@@ -164,7 +164,7 @@ export function BoardView(props: BoardViewProps) {
             type="button"
             disabled={Boolean(recipe.error)}
             onClick={() => (session ? setConfirmReset(true) : start())}
-            className="h-11 bg-[var(--green)] px-4 text-sm text-white hover:bg-[var(--green)]/85"
+            className="h-11 bg-[var(--green-solid)] px-4 text-sm text-white hover:bg-[var(--green-solid)]/85"
           >
             {session ? 'やり直す' : 'このレシピで開始'}
           </Button>
@@ -184,7 +184,7 @@ export function BoardView(props: BoardViewProps) {
           {session?.recipeName ?? (recipeName.trim() || '名前のないデッキ')}
         </p>
         {recipeChanged && (
-          <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+          <p className="mt-3 rounded-lg border border-[var(--warning-line-strong)] bg-[var(--warning-bg)] p-3 text-sm leading-6 text-[var(--warning-foreground)]">
             レシピが変更されています。今のシミュレーションは開始時の内容を使っています。「やり直す」で最新のレシピを読み込みます。
           </p>
         )}
@@ -218,7 +218,7 @@ export function BoardView(props: BoardViewProps) {
                 variant="outline"
                 onClick={moveTopDeckCardToGuardian}
                 disabled={session.board.zones.deck.length === 0}
-                className="h-11 border-[var(--line)] bg-white px-3 text-sm"
+                className="h-11 border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
               >
                 山札の上からガーディアンへ
               </Button>
@@ -227,7 +227,7 @@ export function BoardView(props: BoardViewProps) {
                 variant="outline"
                 onClick={mulligan}
                 disabled={!session.canMulligan}
-                className="h-11 border-[var(--line)] bg-white px-3 text-sm"
+                className="h-11 border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
               >
                 手札を引き直す（1回）
               </Button>
@@ -277,7 +277,7 @@ export function BoardView(props: BoardViewProps) {
           <section
             ref={setBattlefieldDropNodeRef}
             className={
-              'rounded-2xl border bg-white/75 p-3 sm:p-4 ' +
+              'rounded-2xl border bg-[var(--surface)]/75 p-3 sm:p-4 ' +
               (battlefieldIsOver
                 ? 'border-[var(--green)] ring-2 ring-[var(--green)]/30'
                 : dragDestinations.includes('battlefield')
@@ -498,7 +498,7 @@ export function BoardView(props: BoardViewProps) {
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 border-[var(--line)] bg-white"
+                        className="h-11 border-[var(--line)] bg-[var(--surface)]"
                         onClick={() => unequipCard(selectedInstance)}
                       >
                         装備を解除
@@ -506,7 +506,7 @@ export function BoardView(props: BoardViewProps) {
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 border-[var(--line)] bg-white"
+                        className="h-11 border-[var(--line)] bg-[var(--surface)]"
                         onClick={() => moveCard(selectedInstance, 'graveyard')}
                       >
                         墓地へ
@@ -514,7 +514,7 @@ export function BoardView(props: BoardViewProps) {
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 border-[var(--line)] bg-white"
+                        className="h-11 border-[var(--line)] bg-[var(--surface)]"
                         onClick={() => moveCard(selectedInstance, 'guardians')}
                       >
                         ガーディアンへ
@@ -528,7 +528,7 @@ export function BoardView(props: BoardViewProps) {
                             key={destination.zone}
                             type="button"
                             variant="outline"
-                            className="h-11 border-[var(--line)] bg-white"
+                            className="h-11 border-[var(--line)] bg-[var(--surface)]"
                             onClick={() =>
                               moveCard(selectedInstance, destination.zone)
                             }
@@ -542,7 +542,7 @@ export function BoardView(props: BoardViewProps) {
                           type="button"
                           variant="outline"
                           disabled={battlefieldIjins.length === 0}
-                          className="h-11 border-[var(--line)] bg-white"
+                          className="h-11 border-[var(--line)] bg-[var(--surface)]"
                           onClick={() => beginEquip(selectedInstance)}
                         >
                           {battlefieldIjins.length === 0
@@ -555,7 +555,7 @@ export function BoardView(props: BoardViewProps) {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 border-[var(--line)] bg-white"
+                    className="h-11 border-[var(--line)] bg-[var(--surface)]"
                     onClick={() => toggleGray(selectedInstance)}
                   >
                     {selectedInstance.isGrayedOut
@@ -608,7 +608,7 @@ export function BoardView(props: BoardViewProps) {
                         key={ijinInstance.instanceId}
                         type="button"
                         variant="outline"
-                        className="h-auto min-h-11 justify-start whitespace-normal border-[var(--line)] bg-white py-2 text-left"
+                        className="h-auto min-h-11 justify-start whitespace-normal border-[var(--line)] bg-[var(--surface)] py-2 text-left"
                         onClick={() => equipCard(ijinInstance)}
                       >
                         {ijin.name}

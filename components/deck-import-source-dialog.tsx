@@ -82,7 +82,7 @@ export function DeckImportSourceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[#f8f5ee] sm:max-w-xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[var(--paper)] sm:max-w-xl">
         <DialogHeader className="pr-8">
           <DialogTitle className="font-display text-xl">
             デッキをインポート
@@ -92,7 +92,7 @@ export function DeckImportSourceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <section className="space-y-2 rounded-xl border border-[var(--green)] bg-emerald-50/60 p-3 sm:p-4">
+        <section className="space-y-2 rounded-xl border border-[var(--green)] bg-[var(--success-bg)]/60 p-3 sm:p-4">
           <h2 className="font-medium text-[var(--ink)]">
             旧サイトからまとめて移行
           </h2>
@@ -112,7 +112,7 @@ export function DeckImportSourceDialog({
           </Button>
         </section>
 
-        <section className="space-y-2 rounded-xl border border-[var(--line)] bg-white p-3 sm:p-4">
+        <section className="space-y-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
           <h2 className="font-medium text-[var(--ink)]">JSONファイルから</h2>
           <p className="text-sm leading-6 text-[var(--muted)]">
             保存してあるデッキデータを読み込みます。
@@ -127,7 +127,7 @@ export function DeckImportSourceDialog({
           </Button>
         </section>
 
-        <section className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-3 sm:p-4">
+        <section className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
           <div className="space-y-1">
             <h2 className="font-medium text-[var(--ink)]">テキストから</h2>
             <p className="text-sm leading-6 text-[var(--muted)]">
@@ -142,7 +142,7 @@ export function DeckImportSourceDialog({
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="名前がない場合は自動で付けます"
-              className="h-11 bg-white"
+              className="h-11 bg-[var(--surface)]"
             />
           </div>
 
@@ -165,7 +165,7 @@ export function DeckImportSourceDialog({
               placeholder="ここにテキストを貼り付けてください"
               aria-invalid={Boolean(error)}
               aria-describedby="deck-import-text-count"
-              className="min-h-56 resize-y bg-white text-base sm:text-sm"
+              className="min-h-56 resize-y bg-[var(--surface)] text-base sm:text-sm"
             />
           </div>
           <p
@@ -173,7 +173,7 @@ export function DeckImportSourceDialog({
             className={
               'text-right text-xs tabular-nums ' +
               (textLength > MAX_TEXT_LENGTH
-                ? 'text-red-800'
+                ? 'text-[var(--danger-foreground)]'
                 : 'text-[var(--muted)]')
             }
             aria-live="polite"
@@ -183,19 +183,19 @@ export function DeckImportSourceDialog({
           </p>
           {error && (
             <p
-              className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-900"
+              className="rounded-lg border border-[var(--danger-line)] bg-[var(--danger-bg)] p-3 text-sm leading-6 text-[var(--danger-foreground)]"
               role="alert"
             >
               {error}
             </p>
           )}
           {choices.length > 0 && (
-            <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
+            <div className="space-y-3 rounded-lg border border-[var(--warning-line-strong)] bg-[var(--warning-bg)] p-3">
               <div>
-                <h3 className="font-medium text-amber-950">
+                <h3 className="font-medium text-[var(--warning-foreground)]">
                   カードの収録版を選んでください
                 </h3>
-                <p className="mt-1 text-sm leading-6 text-amber-900">
+                <p className="mt-1 text-sm leading-6 text-[var(--warning-foreground)]">
                   同じ名前のカードが複数あります。下の候補から使うカードを選択してください。
                 </p>
               </div>
@@ -209,7 +209,7 @@ export function DeckImportSourceDialog({
                   return (
                     <li
                       key={choice.key}
-                      className="space-y-2 rounded-lg border border-amber-200 bg-white p-3"
+                      className="space-y-2 rounded-lg border border-[var(--warning-line)] bg-[var(--surface)] p-3"
                     >
                       <label
                         htmlFor={selectId}
@@ -228,7 +228,7 @@ export function DeckImportSourceDialog({
                           }));
                           setError(null);
                         }}
-                        className="h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 text-base text-[var(--ink)]"
+                        className="h-11 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 text-base text-[var(--ink)]"
                       >
                         <option value="">収録版を選んでください</option>
                         {choice.candidates.map((card) => (

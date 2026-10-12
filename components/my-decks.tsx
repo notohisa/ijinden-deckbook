@@ -111,7 +111,7 @@ export function MyDecks({
       role="tabpanel"
       aria-label="マイデッキ"
     >
-      <section className="rounded-2xl border border-[var(--line)] bg-white/75 p-3">
+      <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]/75 p-3">
         <div className="mb-3 flex items-center justify-between gap-3 px-1 pt-1">
           <div>
             <p className="label">MY DECKS</p>
@@ -139,7 +139,7 @@ export function MyDecks({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="デッキ名・カード名で検索"
             aria-label="デッキ名・カード名で検索"
-            className="h-11 border-[var(--line)] bg-white pl-9 text-base"
+            className="h-11 border-[var(--line)] bg-[var(--surface)] pl-9 text-base"
           />
         </label>
         <div
@@ -179,7 +179,7 @@ export function MyDecks({
             id="my-decks-sort"
             value={sortOrder}
             onChange={(event) => setSortOrder(event.target.value as SortOrder)}
-            className="h-9 min-w-40 rounded-lg border border-[var(--line)] bg-white px-2 text-sm"
+            className="h-9 min-w-40 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-2 text-sm"
           >
             <option value="updated-desc">更新が新しい順</option>
             <option value="updated-asc">更新が古い順</option>
@@ -220,7 +220,7 @@ export function MyDecks({
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') void finishRenaming();
                     }}
-                    className="h-10 border-[var(--line)] bg-white text-base"
+                    className="h-10 border-[var(--line)] bg-[var(--surface)] text-base"
                   />
                   <div className="mt-2 flex justify-end gap-1">
                     <Button
@@ -318,7 +318,7 @@ export function MyDecks({
                     </div>
                   </div>
                   {isChoosingColor && (
-                    <div className="grid grid-cols-3 gap-1 rounded-lg border border-[var(--line)] bg-white p-1.5">
+                    <div className="grid grid-cols-3 gap-1 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-1.5">
                       <p className="col-span-3 px-1 text-xs text-[var(--muted)]">
                         デッキの色
                       </p>
@@ -375,8 +375,8 @@ function StatusFilterButton({
       onClick={onClick}
       className={
         active
-          ? 'border-[var(--ink)] bg-[var(--ink)] !text-white hover:bg-[var(--ink)]/85 hover:!text-white'
-          : 'border-[var(--line)] bg-white text-[var(--ink)]'
+          ? 'border-[var(--ink)] bg-[var(--ink)] !text-[var(--paper)] hover:bg-[var(--ink)]/85 hover:!text-[var(--paper)]'
+          : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]'
       }
     >
       {children}

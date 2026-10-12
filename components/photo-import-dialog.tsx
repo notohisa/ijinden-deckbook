@@ -254,13 +254,13 @@ export function PhotoImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto bg-[#f8f5ee] sm:max-w-3xl">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto bg-[var(--paper)] sm:max-w-3xl">
         <DialogHeader className="pr-8">
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle className="font-display text-xl">
               写真から取り込み
             </DialogTitle>
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-950">
+            <span className="rounded-full bg-[var(--warning-bg-strong)] px-2 py-0.5 text-xs font-semibold text-[var(--warning-foreground)]">
               試験版
             </span>
           </div>
@@ -272,7 +272,7 @@ export function PhotoImportDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-[var(--line)] bg-white p-3 text-sm leading-6 text-[var(--muted)] sm:p-4">
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-sm leading-6 text-[var(--muted)] sm:p-4">
             <p className="font-medium text-[var(--ink)]">撮影のコツ</p>
             <p>
               カードを重ねず、明るい場所で、カード全体が入るように撮影してください。
@@ -307,18 +307,18 @@ export function PhotoImportDialog({
 
           {isProcessing && (
             <output
-              className="block rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950"
+              className="block rounded-xl border border-[var(--info-line)] bg-[var(--info-bg)] p-3 text-sm text-[var(--info-foreground)]"
               aria-live="polite"
             >
-              <div className="mb-2 h-2 overflow-hidden rounded-full bg-blue-100">
-                <div className="h-full w-2/3 animate-pulse rounded-full bg-blue-500" />
+              <div className="mb-2 h-2 overflow-hidden rounded-full bg-[var(--info-bg-strong)]">
+                <div className="h-full w-2/3 animate-pulse rounded-full bg-[var(--info-bg)]0" />
               </div>
               {progress || '写真を読み取っています…'}
             </output>
           )}
           {error && (
             <p
-              className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-900"
+              className="rounded-lg border border-[var(--danger-line)] bg-[var(--danger-bg)] p-3 text-sm leading-6 text-[var(--danger-foreground)]"
               role="alert"
             >
               {error}
@@ -334,11 +334,11 @@ export function PhotoImportDialog({
           )}
 
           {imageUrl && (
-            <div className="grid gap-3 rounded-xl border border-[var(--line)] bg-white p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <div className="grid gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <img
                 src={imageUrl}
                 alt="読み取りに使った写真"
-                className="max-h-52 w-full rounded-lg bg-slate-100 object-contain"
+                className="max-h-52 w-full rounded-lg bg-[var(--mist)] object-contain"
               />
               <div className="text-sm leading-6 text-[var(--muted)]">
                 <p className="font-medium text-[var(--ink)]">
@@ -354,7 +354,7 @@ export function PhotoImportDialog({
           )}
 
           {warnings.length > 0 && (
-            <ul className="list-disc rounded-lg border border-amber-200 bg-amber-50 p-3 pl-8 text-sm leading-6 text-amber-950">
+            <ul className="list-disc rounded-lg border border-[var(--warning-line)] bg-[var(--warning-bg)] p-3 pl-8 text-sm leading-6 text-[var(--warning-foreground)]">
               {warnings.map((warning, index) => (
                 <li key={String(index)}>{warning}</li>
               ))}
@@ -372,7 +372,7 @@ export function PhotoImportDialog({
                     1つの枠が写真中のカード1枚です。要確認の候補は確認するまで取り込まれません。
                   </p>
                   {unresolvedMatchCount > 0 && (
-                    <p className="mt-1 rounded-lg bg-amber-50 px-2 py-1 text-xs leading-5 text-amber-950">
+                    <p className="mt-1 rounded-lg bg-[var(--warning-bg)] px-2 py-1 text-xs leading-5 text-[var(--warning-foreground)]">
                       未解決の検出枠が{unresolvedMatchCount}
                       件あります。候補を選んで確認するか、不要な枠を削除してください。
                     </p>
@@ -391,8 +391,8 @@ export function PhotoImportDialog({
                   className={
                     'min-h-10 rounded-lg border px-3 text-sm ' +
                     (!showAllMatches
-                      ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
-                      : 'border-[var(--line)] bg-white text-[var(--ink)]')
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]')
                   }
                 >
                   要確認のみ（{reviewMatchCount}）
@@ -404,8 +404,8 @@ export function PhotoImportDialog({
                   className={
                     'min-h-10 rounded-lg border px-3 text-sm ' +
                     (showAllMatches
-                      ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
-                      : 'border-[var(--line)] bg-white text-[var(--ink)]')
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]')
                   }
                 >
                   すべて（{matches.length}）
@@ -442,13 +442,13 @@ export function PhotoImportDialog({
                   return (
                     <li
                       key={match.id}
-                      className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-xl border border-[var(--line)] bg-white p-2.5 sm:grid-cols-[5rem_minmax(0,1fr)] sm:p-3"
+                      className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2.5 sm:grid-cols-[5rem_minmax(0,1fr)] sm:p-3"
                     >
                       <div className="space-y-1">
                         <img
                           src={match.cropUrl}
                           alt={'検出 ' + String(index + 1) + ' の切り抜き'}
-                          className="aspect-[2/3] w-full rounded-md bg-slate-100 object-contain"
+                          className="aspect-[2/3] w-full rounded-md bg-[var(--mist)] object-contain"
                         />
                         <span className="block text-center text-xs tabular-nums text-[var(--muted)]">
                           {index + 1} / {matches.length}
@@ -461,8 +461,8 @@ export function PhotoImportDialog({
                               'rounded-full px-2 py-0.5 text-xs font-medium ' +
                               (!match.selectedCardId ||
                               match.confidence === 'review'
-                                ? 'bg-amber-100 text-amber-950'
-                                : 'bg-emerald-100 text-emerald-900')
+                                ? 'bg-[var(--warning-bg-strong)] text-[var(--warning-foreground)]'
+                                : 'bg-[var(--success-bg-strong)] text-[var(--success-foreground)]')
                             }
                           >
                             {!match.selectedCardId
@@ -475,7 +475,7 @@ export function PhotoImportDialog({
                             className={
                               'text-xs ' +
                               (isIncluded
-                                ? 'text-emerald-800'
+                                ? 'text-[var(--success-foreground)]'
                                 : 'text-[var(--muted)]')
                             }
                           >
@@ -483,7 +483,7 @@ export function PhotoImportDialog({
                           </span>
                           <button
                             type="button"
-                            className="ml-auto min-h-9 rounded-md px-2 text-sm text-red-700 underline decoration-red-300 underline-offset-2 hover:bg-red-50"
+                            className="ml-auto min-h-9 rounded-md px-2 text-sm text-[var(--danger-foreground)] underline decoration-red-300 underline-offset-2 hover:bg-[var(--danger-bg)]"
                             onClick={() =>
                               setMatches((previous) =>
                                 previous.filter((item) => item.id !== match.id),
@@ -512,7 +512,7 @@ export function PhotoImportDialog({
                                   confirmed: Boolean(event.target.value),
                                 })
                               }
-                              className="mt-1 h-11 w-full rounded-lg border border-[var(--line)] bg-white px-3 text-sm text-[var(--ink)]"
+                              className="mt-1 h-11 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]"
                             >
                               <option value="">候補を選んでください</option>
                               {candidateCards.map((card) => (
@@ -536,7 +536,7 @@ export function PhotoImportDialog({
                               }))
                             }
                             placeholder="カード名・番号"
-                            className="mt-1 h-11 w-full rounded-lg border border-[var(--line)] bg-white px-3 text-sm text-[var(--ink)] placeholder:text-slate-400"
+                            className="mt-1 h-11 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)] placeholder:text-[var(--muted)]"
                           />
                         </label>
                         {query.trim() && (
@@ -545,7 +545,7 @@ export function PhotoImportDialog({
                               <button
                                 key={card.id}
                                 type="button"
-                                className="min-h-10 rounded-lg border border-[var(--line)] bg-white px-2 text-left text-xs leading-5 text-[var(--ink)] hover:bg-[var(--soft)]"
+                                className="min-h-10 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-2 text-left text-xs leading-5 text-[var(--ink)] hover:bg-[var(--soft)]"
                                 onClick={() => {
                                   updateMatch(match.id, {
                                     selectedCardId: card.id,
@@ -569,7 +569,7 @@ export function PhotoImportDialog({
                         )}
 
                         {match.confidence === 'review' && (
-                          <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-amber-50 px-2 text-sm text-amber-950">
+                          <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-[var(--warning-bg)] px-2 text-sm text-[var(--warning-foreground)]">
                             <input
                               type="checkbox"
                               checked={match.confirmed}
@@ -598,8 +598,8 @@ export function PhotoImportDialog({
                             className={
                               'min-h-10 rounded-lg border px-3 text-sm ' +
                               (match.pile === 'main'
-                                ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
-                                : 'border-[var(--line)] bg-white text-[var(--ink)]')
+                                ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                                : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]')
                             }
                           >
                             メイン
@@ -613,8 +613,8 @@ export function PhotoImportDialog({
                             className={
                               'min-h-10 rounded-lg border px-3 text-sm ' +
                               (match.pile === 'side'
-                                ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
-                                : 'border-[var(--line)] bg-white text-[var(--ink)]')
+                                ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                                : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]')
                             }
                           >
                             サイド
@@ -629,7 +629,7 @@ export function PhotoImportDialog({
           )}
 
           {imageUrl && (
-            <section className="space-y-3 rounded-xl border border-[var(--line)] bg-white p-3 sm:p-4">
+            <section className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
               <div>
                 <h2 className="font-medium text-[var(--ink)]">
                   読み取れなかったカードを追加
@@ -646,8 +646,8 @@ export function PhotoImportDialog({
                   className={
                     'min-h-10 rounded-lg border px-3 text-sm ' +
                     (manualPile === 'main'
-                      ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
-                      : 'border-[var(--line)] bg-white text-[var(--ink)]')
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]')
                   }
                 >
                   メインに追加
@@ -659,8 +659,8 @@ export function PhotoImportDialog({
                   className={
                     'min-h-10 rounded-lg border px-3 text-sm ' +
                     (manualPile === 'side'
-                      ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
-                      : 'border-[var(--line)] bg-white text-[var(--ink)]')
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]')
                   }
                 >
                   サイドに追加
@@ -671,7 +671,7 @@ export function PhotoImportDialog({
                 value={manualQuery}
                 onChange={(event) => setManualQuery(event.target.value)}
                 placeholder="カード名・番号で検索"
-                className="h-11 w-full rounded-lg border border-[var(--line)] bg-white px-3 text-sm text-[var(--ink)] placeholder:text-slate-400"
+                className="h-11 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)] placeholder:text-[var(--muted)]"
               />
               {manualQuery.trim() && (
                 <div className="grid gap-1 sm:grid-cols-2">
@@ -722,7 +722,7 @@ export function PhotoImportDialog({
                               ),
                             )
                           }
-                          className="h-9 rounded-md border border-[var(--line)] bg-white px-2 text-xs"
+                          className="h-9 rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 text-xs"
                         >
                           <option value="main">メイン</option>
                           <option value="side">サイド</option>
@@ -735,7 +735,7 @@ export function PhotoImportDialog({
                             )
                           }
                           aria-label={card.name + ' の手動追加を削除'}
-                          className="grid size-9 shrink-0 place-items-center rounded-md text-lg text-red-700 hover:bg-red-50"
+                          className="grid size-9 shrink-0 place-items-center rounded-md text-lg text-[var(--danger-foreground)] hover:bg-[var(--danger-bg)]"
                         >
                           ×
                         </button>
@@ -755,13 +755,13 @@ export function PhotoImportDialog({
                 value={deckName}
                 onChange={(event) => setDeckName(event.target.value)}
                 maxLength={100}
-                className="mt-1 h-11 w-full rounded-lg border border-[var(--line)] bg-white px-3 text-[var(--ink)]"
+                className="mt-1 h-11 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 text-[var(--ink)]"
               />
             </label>
           )}
         </div>
 
-        <DialogFooter className="sticky bottom-0 bg-[#f1ede4]">
+        <DialogFooter className="sticky bottom-0 bg-[var(--paper)]">
           <Button
             type="button"
             variant="outline"

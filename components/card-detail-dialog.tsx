@@ -154,7 +154,7 @@ export function CardDetailDialog({
       : null;
   return (
     <Dialog open={Boolean(card)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto bg-[#f8f5ee] sm:max-w-2xl">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto bg-[var(--paper)] sm:max-w-2xl">
         {card && (
           <>
             <DialogHeader className="pr-8">
@@ -179,7 +179,7 @@ export function CardDetailDialog({
                   src={card.imageUrl}
                   alt={card.name + 'のカード画像'}
                   draggable={false}
-                  className="h-full w-full rounded-lg border border-black/20 bg-white object-cover object-top shadow-lg"
+                  className="h-full w-full rounded-lg border border-black/20 bg-[var(--surface)] object-cover object-top shadow-lg"
                 />
                 {canNavigate && navigationCardIds && (
                   <>
@@ -217,7 +217,7 @@ export function CardDetailDialog({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap gap-1.5 text-xs">
-                  <span className="rounded-full bg-[var(--ink)] px-2 py-1 text-white">
+                  <span className="rounded-full bg-[var(--ink)] px-2 py-1 text-[var(--paper)]">
                     {card.cardType}
                   </span>
                   <span className="rounded-full bg-[var(--mist)] px-2 py-1">

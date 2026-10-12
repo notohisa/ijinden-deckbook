@@ -101,7 +101,7 @@ export function DeckRecipe({
 
   return (
     <section
-      className="mx-auto min-w-0 max-w-4xl rounded-2xl border border-[var(--line)] bg-white/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]"
+      className="mx-auto min-w-0 max-w-4xl rounded-2xl border border-[var(--line)] bg-[var(--surface)]/85 shadow-[0_16px_40px_rgb(33_38_45/0.06)]"
       role="tabpanel"
       aria-label="レシピ"
     >
@@ -113,7 +113,7 @@ export function DeckRecipe({
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
             size="sm"
-            className="bg-[var(--green)] text-white hover:bg-[var(--green)]/85"
+            className="bg-[var(--green-solid)] text-white hover:bg-[var(--green-solid)]/85"
             onClick={onSave}
           >
             マイデッキに保存
@@ -121,7 +121,7 @@ export function DeckRecipe({
           <Button
             size="sm"
             variant="outline"
-            className="border-[var(--red)] text-[var(--red)] hover:bg-red-50 hover:text-[var(--red)]"
+            className="border-[var(--red)] text-[var(--red)] hover:bg-[var(--danger-bg)] hover:text-[var(--red)]"
             onClick={onClear}
           >
             レシピをクリア
@@ -137,7 +137,7 @@ export function DeckRecipe({
             placeholder="デッキ名を入力（任意）"
             value={deck.name}
             onChange={(event) => onNameChange(event.target.value)}
-            className="h-11 w-full border-[var(--line)] bg-white px-3 text-base shadow-none"
+            className="h-11 w-full border-[var(--line)] bg-[var(--surface)] px-3 text-base shadow-none"
           />
         </div>
         <DeckShareActions deck={deck} cardsById={cardsById} />
@@ -156,7 +156,7 @@ export function DeckRecipe({
         </div>
         <RuleCheck validation={validation} />
         <RegulationStatus validations={regulationValidations} />
-        <div className="mt-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
+        <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] font-medium tracking-wide text-[var(--muted)]">
               種類別枚数
@@ -255,7 +255,7 @@ function RuleCheck({ validation }: { validation: DeckValidation }) {
   ];
   return (
     <section
-      className="mt-3 rounded-xl border border-[var(--line)] bg-white px-3 py-3"
+      className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-3"
       aria-label="ルールチェック"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -273,9 +273,9 @@ function RuleCheck({ validation }: { validation: DeckValidation }) {
       )}
       {validation.status === 'incomplete' && (
         <div className="mt-2 space-y-1 text-sm leading-6">
-          <p className="font-medium text-amber-900">🟡 作成途中</p>
+          <p className="font-medium text-[var(--warning-foreground)]">🟡 作成途中</p>
           {validation.warnings.map((issue) => (
-            <p key={issue.code} className="text-amber-950">
+            <p key={issue.code} className="text-[var(--warning-foreground)]">
               {issue.title}が{issue.detail}
             </p>
           ))}
@@ -298,7 +298,7 @@ function RuleCheck({ validation }: { validation: DeckValidation }) {
             </p>
           ))}
           {validation.warnings.map((issue) => (
-            <p key={issue.code} className="text-amber-950">
+            <p key={issue.code} className="text-[var(--warning-foreground)]">
               🟡 {issue.title}が{issue.detail}
             </p>
           ))}
@@ -373,7 +373,7 @@ function DeckPile({
               <li
                 key={card.id}
                 data-deck-card-key={cardSelectionKey}
-                className="relative h-[112px] w-[80px] overflow-hidden rounded-md border border-black/15 bg-white shadow-sm"
+                className="relative h-[112px] w-[80px] overflow-hidden rounded-md border border-black/15 bg-[var(--surface)] shadow-sm"
               >
                 <button
                   type="button"
@@ -413,7 +413,7 @@ function DeckPile({
                       type="button"
                       onClick={() => onSelectCard(card.id, orderedCardIds)}
                       aria-label={card.name + 'の詳細を開く'}
-                      className="absolute left-1/2 top-1/2 z-20 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-md border border-white/80 bg-white/95 text-base text-[var(--ink)] shadow-sm hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
+                      className="absolute left-1/2 top-1/2 z-20 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-md border border-white/80 bg-[var(--surface)]/95 text-base text-[var(--ink)] shadow-sm hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
                     >
                       ⌕
                     </button>
@@ -421,7 +421,7 @@ function DeckPile({
                 )}
                 <output
                   aria-label={card.name + '：' + count + '枚'}
-                  className="absolute bottom-0 left-0 min-w-6 rounded-tr-md border-r border-t border-black/30 bg-white px-1.5 py-0.5 text-center font-display text-sm leading-none text-[var(--ink)]"
+                  className="absolute bottom-0 left-0 min-w-6 rounded-tr-md border-r border-t border-black/30 bg-[var(--surface)] px-1.5 py-0.5 text-center font-display text-sm leading-none text-[var(--ink)]"
                 >
                   {count}
                 </output>

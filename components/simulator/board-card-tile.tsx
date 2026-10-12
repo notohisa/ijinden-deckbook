@@ -51,7 +51,7 @@ export function BoardCardTile({
               : 'の操作メニューを開く')
         }
         className={
-          'relative block h-[112px] w-[80px] touch-manipulation overflow-hidden rounded-md border border-[var(--line)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)] ' +
+          'relative block h-[112px] w-[80px] touch-manipulation overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)] ' +
           (isDragging ? 'opacity-30 ' : '') +
           (instance.isGrayedOut ? 'grayscale opacity-60' : '')
         }
@@ -98,7 +98,7 @@ export function SimulationDragPreview({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none h-[112px] w-[80px] overflow-hidden rounded-md border border-[var(--line)] bg-white shadow-xl"
+      className="pointer-events-none h-[112px] w-[80px] overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)] shadow-xl"
     >
       {instance.faceDown ? (
         <span className="grid h-full place-content-center gap-1 bg-[var(--ink)] px-1 text-xs leading-5 text-[var(--paper)]">

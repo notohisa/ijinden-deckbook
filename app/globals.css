@@ -2,14 +2,53 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 :root {
-  --paper: #f4f0e7; --soft: #fbf9f4; --mist: #e8edf0; --ink: #202b35;
-  --muted: #69737a; --line: #d8d3c8; --red: #b8493f; --green: #2e7c68;
-  --background: var(--paper); --foreground: var(--ink); --card: #fff; --card-foreground: var(--ink);
-  --popover: #fff; --popover-foreground: var(--ink); --primary: var(--ink); --primary-foreground: var(--paper);
+  color-scheme: light;
+  --paper: #f4f0e7; --soft: #fbf9f4; --surface: #fff; --mist: #e8edf0; --ink: #202b35;
+  --muted: #69737a; --line: #d8d3c8; --red: #b8493f; --red-solid: #b8493f;
+  --green: #2e7c68; --green-solid: #2e7c68;
+  --danger-bg: #fef2f2; --danger-bg-strong: #fee2e2; --danger-line: #fecaca;
+  --danger-line-strong: #fca5a5; --danger-foreground: #7f1d1d;
+  --warning-bg: #fffbeb; --warning-bg-strong: #fef3c7; --warning-bg-stronger: #fde68a;
+  --warning-line: #fde68a; --warning-line-strong: #fcd34d; --warning-foreground: #451a03;
+  --success-bg: #ecfdf5; --success-bg-strong: #d1fae5; --success-line: #a7f3d0;
+  --success-foreground: #064e3b;
+  --info-bg: #eff6ff; --info-bg-strong: #dbeafe; --info-line: #bfdbfe;
+  --info-foreground: #172554;
+  --catalog-tint-red: #f9d2ca; --catalog-tint-blue: #d7e8f7;
+  --catalog-tint-green: #d9eddf; --catalog-tint-yellow: #fff0bb;
+  --catalog-tint-purple: #e9dcf3; --catalog-tint-neutral: #e8edf0;
+  --selection-background: #cfe1de; --selection-foreground: var(--ink);
+  --background: var(--paper); --foreground: var(--ink); --card: var(--surface); --card-foreground: var(--ink);
+  --popover: var(--surface); --popover-foreground: var(--ink); --primary: var(--ink); --primary-foreground: var(--paper);
   --secondary: var(--mist); --secondary-foreground: var(--ink); --muted-foreground: var(--muted);
   --accent: var(--mist); --accent-foreground: var(--ink); --destructive: #b8493f; --border: var(--line);
   --input: var(--line); --ring: #6f99a0; --radius: .8rem;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #181818; --soft: #242424; --surface: #242424; --mist: #303030; --ink: #e7e4dc;
+  --muted: #b0aca4; --line: #45423d; --red: #ed8d82; --red-solid: #873b34;
+  --green: #86cbb2; --green-solid: #285f50;
+  --danger-bg: #382322; --danger-bg-strong: #482b28; --danger-line: #76423d;
+  --danger-line-strong: #8f554e; --danger-foreground: #ffc0b7;
+  --warning-bg: #382f1e; --warning-bg-strong: #44371f; --warning-bg-stronger: #594622;
+  --warning-line: #65552d; --warning-line-strong: #766232; --warning-foreground: #f4d98f;
+  --success-bg: #20332c; --success-bg-strong: #293e34; --success-line: #3c6656;
+  --success-foreground: #b4dfca;
+  --info-bg: #202f3c; --info-bg-strong: #293d4d; --info-line: #3d5b70;
+  --info-foreground: #bfddf1;
+  --catalog-tint-red: #55332e; --catalog-tint-blue: #2e4050;
+  --catalog-tint-green: #2e4738; --catalog-tint-yellow: #514526;
+  --catalog-tint-purple: #42354f; --catalog-tint-neutral: #34393c;
+  --selection-background: #46515c; --selection-foreground: #fff;
+  --background: var(--paper); --foreground: var(--ink); --card: var(--surface); --card-foreground: var(--ink);
+  --popover: var(--surface); --popover-foreground: var(--ink); --primary: var(--ink); --primary-foreground: var(--paper);
+  --secondary: var(--mist); --secondary-foreground: var(--ink); --muted-foreground: var(--muted);
+  --accent: var(--mist); --accent-foreground: var(--ink); --destructive: var(--red); --border: var(--line);
+  --input: var(--line); --ring: #91b9c0;
 }
 @theme inline {
   --color-background: var(--background); --color-foreground: var(--foreground);
@@ -24,7 +63,8 @@
   --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
 }
 * { box-sizing: border-box; }
-html { background: var(--paper); }
+html { background: var(--paper); color-scheme: light; }
+html[data-theme='dark'] { color-scheme: dark; }
 body { margin: 0; font-family: Arial, 'Hiragino Sans', 'Yu Gothic UI', sans-serif; }
 button, input { font: inherit; }
 .font-display { font-family: Georgia, 'Yu Mincho', 'Hiragino Mincho ProN', serif; }
@@ -33,4 +73,5 @@ button, input { font: inherit; }
 main > :not(.page-grain) { position: relative; z-index: 1; }
 .card-sigil { display: grid; height: 34px; width: 34px; place-items: center; border-radius: 9px 9px 3px 9px; color: #fff; font-family: Georgia, 'Yu Mincho', serif; font-size: 14px; font-weight: bold; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); }
 .sigil-赤 { background: #c05443; } .sigil-青 { background: #477d9c; } .sigil-黄 { background: #bb9136; } .sigil-緑 { background: #498060; } .sigil-紫 { background: #6f5e91; } .sigil-白 { background: #9da5a8; } .sigil-黒 { background: #37404a; }
-::selection { background: #cfe1de; color: var(--ink); }
+:root[data-theme='dark'] .sigil-白 { background: #737b7e; }
+::selection { background: var(--selection-background); color: var(--selection-foreground); }
