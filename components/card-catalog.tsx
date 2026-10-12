@@ -585,7 +585,7 @@ function FilterPill({
     <Button
       type="button"
       size="xs"
-      variant="outline"
+      variant={active ? 'default' : 'outline'}
       aria-pressed={active}
       onClick={onClick}
       className={

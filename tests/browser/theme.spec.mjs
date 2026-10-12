@@ -211,3 +211,65 @@ test('colored card IDs and saved-deck rows remain legible in dark mode', async (
     await expect.poll(() => textContrast(name)).toBeGreaterThanOrEqual(4.5);
   }
 });
+
+test.describe('selected filters stay readable on a phone', () => {
+  test.use({ hasTouch: true });
+
+  for (const theme of ['dark', 'light']) {
+    test(`catalog filter remains readable before and after selection in ${theme}`, async ({
+      context,
+      page,
+    }) => {
+      await seed(context);
+      await page.goto('./');
+      await selector(page).selectOption(theme);
+      const catalog = page.getByRole('tabpanel', {
+        name: 'カードを探す',
+        exact: true,
+      });
+      await catalog
+        .locator('summary')
+        .filter({ hasText: '条件で絞り込む' })
+        .tap();
+      const filter = catalog.getByRole('button', {
+        name: 'イジン',
+        exact: true,
+      });
+      await expect(filter).toHaveAttribute('aria-pressed', 'false');
+      await expect.poll(() => textContrast(filter)).toBeGreaterThanOrEqual(4.5);
+      await filter.tap();
+      await expect(filter).toHaveAttribute('aria-pressed', 'true');
+      await expect.poll(() => textContrast(filter)).toBeGreaterThanOrEqual(4.5);
+      await filter.hover();
+      await expect.poll(() => textContrast(filter)).toBeGreaterThanOrEqual(4.5);
+      await filter.tap();
+      await expect(filter).toHaveAttribute('aria-pressed', 'false');
+      await expect.poll(() => textContrast(filter)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    test(`saved-deck status filters remain readable after selection in ${theme}`, async ({
+      context,
+      page,
+    }) => {
+      await seed(context);
+      await page.goto('./');
+      await selector(page).selectOption(theme);
+      await page.getByRole('tab', { name: 'マイデッキ', exact: true }).tap();
+      const panel = page.getByRole('tabpanel', {
+        name: 'マイデッキ',
+        exact: true,
+      });
+      const all = panel.getByRole('button', { name: /^すべて \d+$/ });
+      const valid = panel.getByRole('button', { name: /^使用可能 \d+$/ });
+      await expect(all).toHaveAttribute('aria-pressed', 'true');
+      await expect.poll(() => textContrast(all)).toBeGreaterThanOrEqual(4.5);
+      await valid.tap();
+      await expect(valid).toHaveAttribute('aria-pressed', 'true');
+      await expect(all).toHaveAttribute('aria-pressed', 'false');
+      await expect.poll(() => textContrast(valid)).toBeGreaterThanOrEqual(4.5);
+      await expect.poll(() => textContrast(all)).toBeGreaterThanOrEqual(4.5);
+      await valid.hover();
+      await expect.poll(() => textContrast(valid)).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+});
