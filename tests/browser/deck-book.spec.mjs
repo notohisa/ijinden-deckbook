@@ -51,9 +51,9 @@ test('import confirmation detects a saved-deck change while waiting for the writ
     .toBe(1);
   await other.evaluate(() => window.releaseArchiveLock());
   await expect(
-    preview.getByText(/この端末の既存デッキを更新します/),
+    preview.getByText('移行デッキ (2)', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole('alert', { includeHidden: true })).toContainText(
+  await expect(page.getByRole('alert', { includeHidden: true }).filter({ hasText: '別のタブでマイデッキが変更されました' })).toContainText(
     '別のタブでマイデッキが変更されました',
   );
   expect(
@@ -64,7 +64,7 @@ test('import confirmation detects a saved-deck change while waiting for the writ
     .click();
   await expect(preview).toHaveCount(0);
   expect(
-    (await stored(page)).decks.find((d) => d.name === '移行デッキ').main,
+    (await stored(page)).decks.find((d) => d.name === '移行デッキ (2)').main,
   ).toEqual({ '02-005': 1 });
 });
 

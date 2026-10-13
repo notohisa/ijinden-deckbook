@@ -44,14 +44,23 @@ jobs:
           pnpm typecheck
           pnpm test
 
-      - name: Build static site
+      - name: Build static site for mocked Google tests
         run: pnpm run build:pages
+        env:
+          VITE_GOOGLE_CLIENT_ID: test-client.apps.googleusercontent.com
 
       - name: Install Chromium for browser tests
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Browser regression tests
         run: pnpm test:browser
+        env:
+          SYNC_BROWSER_TESTS: '1'
+
+      - name: Build publishable static site
+        run: pnpm run build:pages
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
 
       - name: Upload browser failure traces
         if: failure()

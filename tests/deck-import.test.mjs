@@ -90,21 +90,22 @@ test('import rejects unsafe counts created by combining an old and canonical ID'
   assert.equal(result.invalidDecks[0].name, '枚数超過');
 });
 
-test('同名の既存デッキは更新、それ以外は新規としてプレビューする', () => {
+test('同名でもIDが異なれば番号を付けて新規としてプレビューする', () => {
   const existing = [deck('local', '赤単')];
   const imported = [deck('from-file', '赤単'), deck('new', '青単')];
   const preview = createImportPreview(imported, existing);
   assert.deepEqual(
     preview.map((item) => item.action),
-    ['update', 'add'],
+    ['add', 'add'],
   );
-  assert.equal(preview[0].existingDeck?.id, 'local');
+  assert.equal(preview[0].existingDeck, undefined);
+  assert.equal(preview[0].deck.name, '赤単 (2)');
 });
 
-test('選択したインポートだけを同名で上書きし、既存JSONの色や内容を保つ', () => {
+test('選択した同じIDだけを更新し、JSONの色や内容を保つ', () => {
   const existing = [{ ...deck('local', '赤単'), color: 'orange' }];
   const imported = [
-    { ...deck('from-file', '赤単', { '01-002': 40 }), color: 'gray' },
+    { ...deck('local', '赤単', { '01-002': 40 }), color: 'gray' },
     deck('new', '青単'),
   ];
   const result = mergeImportedDecks(existing, [imported[0]]);

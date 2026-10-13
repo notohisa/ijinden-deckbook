@@ -14,6 +14,7 @@ import {
   SavedDecksChangedError,
   savedDecksKey,
   draftKey,
+  syncKey,
   type ArchiveRepository,
   type ReadyArchive,
 } from '@/lib/deck-archive-repository';
@@ -32,6 +33,7 @@ import {
 } from '@/lib/deck-operations';
 import { copyDeckAsDraft, newDeck } from '@/lib/deck-utils';
 import { mergeImportedDecks } from '@/lib/deck-import';
+import type { SyncRecord } from '@/lib/deck-sync';
 
 const TAB_DRAFT_KEY = 'ijinden-deckbook:tab-draft-v1';
 const ARCHIVE_LOCK = 'ijinden-deckbook:archive';
@@ -40,9 +42,9 @@ const unsupportedMessage =
 
 type TabDraft = { draft: Deck; baseline: string; touched: boolean };
 
-function readTabDraft(): TabDraft | null {
+function readTabDraft(key: string): TabDraft | null {
   try {
-    const raw = sessionStorage.getItem(TAB_DRAFT_KEY);
+    const raw = sessionStorage.getItem(key);
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<TabDraft>;
     if (
@@ -66,7 +68,18 @@ function readTabDraft(): TabDraft | null {
 }
 
 /** Owns browser persistence; page components only issue deck operations. */
-export function useDeckBook(notify: (message: string) => void) {
+export function useDeckBook(
+  notify: (message: string) => void,
+  storageKey = localStorageKey,
+) {
+  const tabDraftKey =
+    storageKey === localStorageKey
+      ? TAB_DRAFT_KEY
+      : `${TAB_DRAFT_KEY}:${storageKey}`;
+  const archiveLock =
+    storageKey === localStorageKey
+      ? ARCHIVE_LOCK
+      : `${ARCHIVE_LOCK}:${storageKey}`;
   const [activeDeck, setActiveDeck] = useState<Deck>(() => ({
     id: 'new-deck',
     name: '新しいデッキ',
@@ -93,7 +106,7 @@ export function useDeckBook(notify: (message: string) => void) {
   const checkpoint = useCallback(() => {
     try {
       sessionStorage.setItem(
-        TAB_DRAFT_KEY,
+        tabDraftKey,
         JSON.stringify({
           draft: draft.current,
           baseline: baseline.current,
@@ -103,7 +116,7 @@ export function useDeckBook(notify: (message: string) => void) {
     } catch {
       // Shared persistence still works when optional per-tab recovery is unavailable.
     }
-  }, []);
+  }, [tabDraftKey]);
 
   const receive = useCallback(
     (snapshot: ReadyArchive) => {
@@ -188,10 +201,10 @@ export function useDeckBook(notify: (message: string) => void) {
     mounted.current = true;
     repository.current = createArchiveRepository(
       {
-        read: () => localStorage.getItem(localStorageKey),
+        read: () => localStorage.getItem(storageKey),
         write: (raw) => {
           try {
-            localStorage.setItem(localStorageKey, raw);
+            localStorage.setItem(storageKey, raw);
           } catch {
             throw new Error(
               'この端末に保存できませんでした。編集中の内容をコピーし、マイデッキをエクスポートしてください。',
@@ -201,7 +214,7 @@ export function useDeckBook(notify: (message: string) => void) {
         exclusive: (operation) => {
           if (!navigator.locks)
             return Promise.reject(new Error(unsupportedMessage));
-          return navigator.locks.request(ARCHIVE_LOCK, operation);
+          return navigator.locks.request(archiveLock, operation);
         },
       },
       draft.current,
@@ -210,7 +223,7 @@ export function useDeckBook(notify: (message: string) => void) {
     setArchiveLoad(snapshot);
     if (snapshot.status === 'ready') {
       setDecks(snapshot.decks);
-      const recovery = readTabDraft();
+      const recovery = readTabDraft(tabDraftKey);
       draft.current = recovery?.draft ?? snapshot.draft ?? draft.current;
       baseline.current = recovery?.baseline ?? draftKey(snapshot.draft);
       touched.current = recovery?.touched ?? false;
@@ -228,7 +241,7 @@ export function useDeckBook(notify: (message: string) => void) {
         persistDraft(draft.current);
     }
     function refresh(event?: StorageEvent) {
-      if (event && event.key !== localStorageKey && event.key !== null) return;
+      if (event && event.key !== storageKey && event.key !== null) return;
       // Read current storage, not event.newValue, which may already be stale.
       void enqueue(async (repo) => {
         const current = repo.read();
@@ -292,13 +305,25 @@ export function useDeckBook(notify: (message: string) => void) {
 
   async function saveActiveDeck(asCopy = false) {
     const current = draft.current;
-    const name = await changeDecks((latest) =>
-      addSavedDeck(latest, current, asCopy),
-    );
-    if (name !== undefined)
+    const saved = await changeDecks((latest) => {
+      const result = addSavedDeck(latest, current, asCopy);
+      return {
+        decks: result.decks,
+        value: result.decks.find((deck) => deck.name === result.value)!,
+      };
+    });
+    if (saved !== undefined) {
+      updateActiveDeck((deck) => ({
+        ...deck,
+        sourceId: saved.id,
+        sourceUpdatedAt: saved.updatedAt,
+      }));
       notify(
-        '「' + (name || '名前のないデッキ') + '」をマイデッキに保存しました。',
+        '「' +
+          (saved.name || '名前のないデッキ') +
+          '」をマイデッキに保存しました。',
       );
+    }
   }
 
   async function renameSavedDeck(id: string, name: string): Promise<boolean> {
@@ -326,7 +351,8 @@ export function useDeckBook(notify: (message: string) => void) {
       }),
       savedDecksKey(decks),
     );
-    if (changed) notify('マイデッキから削除しました。');
+    if (changed)
+      notify('ゴミ箱に移しました。同期すると他の端末にも反映されます。');
   }
 
   async function importSelectedDecks(selected: Deck[]) {
@@ -363,6 +389,39 @@ export function useDeckBook(notify: (message: string) => void) {
     draftConflict,
     storageIssue,
     pendingWrites,
+    storageKey,
+    trash:
+      archiveLoad?.status === 'ready'
+        ? (archiveLoad.sync?.records.filter((r) => r.state === 'trash') ?? [])
+        : [],
+    getSyncSnapshot: () =>
+      enqueue(async (repo) => {
+        const snapshot = await repo.initializeSync();
+        receive(snapshot);
+        return snapshot;
+      }),
+    applySyncSnapshot: (
+      expected: string,
+      records: SyncRecord[],
+      lastSyncedAt?: string,
+    ) =>
+      enqueue(async (repo) => {
+        const snapshot = await repo.applySync(expected, records, lastSyncedAt);
+        receive(snapshot);
+        return snapshot;
+      }),
+    changeTrash: (id: string, action: 'restore' | 'purge') => {
+      if (archiveLoad?.status !== 'ready') return;
+      const expected = syncKey(archiveLoad);
+      void enqueue(async (repo) => {
+        receive(await repo.changeTrash(id, action, expected));
+        notify(
+          action === 'restore'
+            ? 'デッキを復元しました。'
+            : '完全削除しました。',
+        );
+      });
+    },
     updateActiveDeck,
     saveActiveDeck,
     renameSavedDeck,
@@ -377,6 +436,10 @@ export function useDeckBook(notify: (message: string) => void) {
       updateActiveDeck((deck) => ({ ...deck, name: '', main: {}, side: {} })),
     createDeck: () => updateActiveDeck(() => newDeck(decks.length + 1)),
     openSavedDeck: (deck: Deck) =>
-      updateActiveDeck(() => copyDeckAsDraft(deck)),
+      updateActiveDeck(() => ({
+        ...copyDeckAsDraft(deck),
+        sourceId: deck.id,
+        sourceUpdatedAt: deck.updatedAt,
+      })),
   };
 }

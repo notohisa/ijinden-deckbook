@@ -28,13 +28,23 @@ export type Deck = {
   updatedAt: string;
   isSaved?: boolean;
   color?: DeckColor;
+  /** The saved deck being edited; omitted for independent copies. */
+  sourceId?: string;
+  sourceUpdatedAt?: string;
+};
+
+export type LocalSyncState = {
+  writerId: string;
+  records: import('../../lib/deck-sync').SyncRecord[];
+  lastSyncedAt?: string;
 };
 
 export type ArchiveData = {
-  version: 2;
+  version: 2 | 3;
   updatedAt: string;
   decks: Deck[];
   draft: Deck;
+  sync?: LocalSyncState;
 };
 
 export type LegacyArchiveData = {

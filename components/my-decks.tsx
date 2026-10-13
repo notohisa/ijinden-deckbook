@@ -306,7 +306,7 @@ export function MyDecks({
                             window.confirm(
                               '「' +
                                 (deck.name || '名前のないデッキ') +
-                                '」を削除しますか？',
+                                '」をゴミ箱に移しますか？',
                             )
                           )
                             onDelete(deck.id);
