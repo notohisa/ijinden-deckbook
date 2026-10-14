@@ -50,6 +50,7 @@ const USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 const USER_SCOPES = ['openid', 'email'];
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const REQUESTED_SCOPES = [...USER_SCOPES, DRIVE_SCOPE];
+const AUTH_SCRIPT_TIMEOUT_MS = 15_000;
 const AUTH_TIMEOUT_MS = 120_000;
 const PROFILE_TIMEOUT_MS = 15_000;
 
@@ -107,8 +108,11 @@ export function loadGoogleAuth(): Promise<void> {
       settled = true;
       script.removeEventListener('load', onLoad);
       script.removeEventListener('error', onError);
-      if (error) reject(error);
-      else resolve();
+      clearTimeout(timeout);
+      if (error) {
+        script.remove();
+        reject(error);
+      } else resolve();
     };
     const onLoad = () => {
       if (!googleApi()?.accounts?.oauth2) {
@@ -122,11 +126,22 @@ export function loadGoogleAuth(): Promise<void> {
     };
     script.addEventListener('load', onLoad, { once: true });
     script.addEventListener('error', onError, { once: true });
-    if (!existing) {
-      script.src = GIS_URL;
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
+    const timeout = setTimeout(
+      () =>
+        finish(
+          authError('Google認証ライブラリの読み込みがタイムアウトしました。'),
+        ),
+      AUTH_SCRIPT_TIMEOUT_MS,
+    );
+    try {
+      if (!existing) {
+        script.src = GIS_URL;
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+    } catch (error) {
+      finish(authError('Google認証ライブラリに接続できませんでした。', error));
     }
   }).catch((error: unknown) => {
     authScriptPromise = undefined;

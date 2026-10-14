@@ -22,6 +22,50 @@ function jsonResponse(value, status = 200) {
   });
 }
 
+function streamedResponse(
+  chunks,
+  { headers, onCancel, keepOpen = false } = {},
+) {
+  let index = 0;
+  return new Response(
+    new ReadableStream({
+      pull(controller) {
+        if (index < chunks.length) controller.enqueue(chunks[index++]);
+        else if (!keepOpen) controller.close();
+      },
+      cancel(reason) {
+        onCancel?.(reason);
+      },
+    }),
+    { headers },
+  );
+}
+
+function paddedSnapshotBytes(size) {
+  const writerId = 'writer-a';
+  const value = snapshot(writerId, [
+    {
+      id: 'deck-a',
+      clock: { [writerId]: 1 },
+      state: 'active',
+      deck: {
+        id: 'deck-a',
+        name: '雪のデッキ',
+        main: {},
+        side: {},
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        isSaved: true,
+      },
+    },
+  ]);
+  const jsonBytes = new TextEncoder().encode(JSON.stringify(value));
+  assert.ok(jsonBytes.byteLength <= size);
+  const bytes = new Uint8Array(size);
+  bytes.set(jsonBytes);
+  bytes.fill(0x20, jsonBytes.byteLength);
+  return bytes;
+}
+
 function listedFile(id, writerId) {
   return {
     id,
@@ -324,4 +368,133 @@ test('file size limits reject oversized responses and writes', async (t) => {
       /上限/u,
     );
   });
+});
+
+test('streamed Drive reads enforce actual per-file and aggregate byte limits', async (t) => {
+  const fileLimit = 2 * 1024 * 1024;
+  const totalLimit = 10 * 1024 * 1024;
+
+  await t.test(
+    'accepts the exact file limit and decodes split UTF-8',
+    async () => {
+      const bytes = paddedSnapshotBytes(fileLimit);
+      const text = JSON.stringify(
+        snapshot('writer-a', [
+          {
+            id: 'deck-a',
+            clock: { 'writer-a': 1 },
+            state: 'active',
+            deck: {
+              id: 'deck-a',
+              name: '雪のデッキ',
+              main: {},
+              side: {},
+              updatedAt: '2026-01-01T00:00:00.000Z',
+              isSaved: true,
+            },
+          },
+        ]),
+      );
+      const snowOffset = new TextEncoder().encode(
+        text.slice(0, text.indexOf('雪')),
+      ).byteLength;
+      const fetcher = async (input, init) => {
+        const url = new URL(String(input));
+        assertBearer(init);
+        if (url.pathname === '/drive/v3/files') {
+          return jsonResponse({ files: [listedFile('boundary', 'writer-a')] });
+        }
+        return streamedResponse(
+          [bytes.slice(0, snowOffset + 1), bytes.slice(snowOffset + 1)],
+          { headers: { 'content-length': String(fileLimit) } },
+        );
+      };
+
+      const result = await createDriveClient('test-token', fetcher).readAll();
+      assert.equal(result.snapshots[0].records[0].deck.name, '雪のデッキ');
+    },
+  );
+
+  await t.test(
+    'cancels an over-limit stream despite understated content length',
+    async () => {
+      let cancelled = false;
+      const bytes = paddedSnapshotBytes(fileLimit + 1);
+      const fetcher = async (input, init) => {
+        const url = new URL(String(input));
+        assertBearer(init);
+        if (url.pathname === '/drive/v3/files') {
+          return jsonResponse({ files: [listedFile('too-large', 'writer-a')] });
+        }
+        return streamedResponse(
+          [bytes.slice(0, fileLimit), bytes.slice(fileLimit)],
+          {
+            headers: { 'content-length': '1' },
+            keepOpen: true,
+            onCancel: () => {
+              cancelled = true;
+            },
+          },
+        );
+      };
+
+      await assert.rejects(
+        createDriveClient('test-token', fetcher).readAll(),
+        /サイズ上限/u,
+      );
+      assert.equal(cancelled, true);
+    },
+  );
+
+  await t.test(
+    'accepts exactly 10 MiB across files and cancels above it',
+    async (t) => {
+      const bytes = paddedSnapshotBytes(fileLimit);
+      const createFetcher = (
+        fileCount,
+        { onCancel = () => {}, keepOpenFileId } = {},
+      ) => {
+        const files = Array.from({ length: fileCount }, (_, index) =>
+          listedFile(`file-${index}`, 'writer-a'),
+        );
+        return async (input, init) => {
+          const url = new URL(String(input));
+          assertBearer(init);
+          if (url.pathname === '/drive/v3/files') {
+            return jsonResponse({ files });
+          }
+          const fileId = decodeURIComponent(url.pathname.split('/').at(-1));
+          return streamedResponse([bytes], {
+            keepOpen: fileId === keepOpenFileId,
+            onCancel,
+          });
+        };
+      };
+
+      await t.test('exact aggregate boundary', async () => {
+        const result = await createDriveClient(
+          'test-token',
+          createFetcher(totalLimit / fileLimit),
+        ).readAll();
+        assert.equal(result.snapshots.length, totalLimit / fileLimit);
+      });
+
+      await t.test('aggregate overflow', async () => {
+        let cancelled = 0;
+        await assert.rejects(
+          createDriveClient(
+            'test-token',
+            createFetcher(totalLimit / fileLimit + 1, {
+              keepOpenFileId: 'file-5',
+              onCancel: () => {
+                cancelled += 1;
+              },
+            }),
+          ).readAll(),
+          /合計.*上限/u,
+        );
+        assert.ok(cancelled > 0);
+      });
+    },
+  );
 });

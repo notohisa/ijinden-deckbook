@@ -127,6 +127,90 @@ test('invalid v2 drafts are blocked', () => {
   );
 });
 
+test('v3 saved decks and active records must match one-to-one before saving', () => {
+  const savedA = deck('saved-a', 'Saved A');
+  const savedB = deck('saved-b', 'Saved B');
+  const activeRecord = (value) => ({
+    id: value.id,
+    clock: { writer: 1 },
+    state: 'active',
+    deck: value,
+  });
+  const invalidArchives = [
+    {
+      decks: [savedA, savedA],
+      records: [activeRecord(savedA), activeRecord(savedB)],
+    },
+    {
+      decks: [savedA, savedB],
+      records: [activeRecord(savedA), activeRecord(deck('orphan', 'Orphan'))],
+    },
+  ];
+
+  for (const { decks, records } of invalidArchives) {
+    const raw = rawArchive({
+      version: 3,
+      decks,
+      draft: deck('draft'),
+      sync: { writerId: 'writer', records },
+    });
+    const result = loadStoredArchive(() => raw);
+    assert.deepEqual(result, {
+      status: 'blocked',
+      raw,
+      reason: 'invalid-data',
+    });
+
+    let stored = raw;
+    let writes = 0;
+    saveStoredArchive(
+      result,
+      {
+        version: 3,
+        updatedAt: '2026-09-11T00:00:00.000Z',
+        decks: [],
+        draft: deck('replacement-draft'),
+        sync: { writerId: 'writer', records: [] },
+      },
+      (value) => {
+        writes += 1;
+        stored = value;
+      },
+    );
+    assert.equal(writes, 0);
+    assert.equal(stored, raw);
+  }
+});
+
+test('v3 saved and active piles match regardless of JSON key order', () => {
+  const saved = deck('saved', 'Saved', { '01-001': 2, '01-002': 3 });
+  const active = {
+    ...saved,
+    main: { '01-002': 3, '01-001': 2 },
+    isSaved: true,
+  };
+  const raw = rawArchive({
+    version: 3,
+    decks: [saved],
+    draft: deck('draft'),
+    sync: {
+      writerId: 'writer',
+      records: [
+        {
+          id: 'saved',
+          clock: { writer: 1 },
+          state: 'active',
+          deck: active,
+        },
+      ],
+    },
+  });
+
+  const result = loadStoredArchive(() => raw);
+  assert.equal(result.status, 'ready');
+  assert.equal(result.source, 'v3');
+});
+
 test('v1 and v2 reject missing deck arrays and preserve partially invalid archives', () => {
   for (const version of [1, 2]) {
     for (const decks of [undefined, {}, [deck('saved'), null]]) {

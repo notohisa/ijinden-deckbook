@@ -18,40 +18,51 @@ function cloud() {
     failMethod: undefined,
   };
 }
-async function setup(context, server, sub = '111') {
+async function setup(
+  context,
+  server,
+  sub = '111',
+  { preloadGoogle = true } = {},
+) {
   await seed(context);
-  await context.addInitScript((sub) => {
-    window.mockGoogleSub = sub;
-    window.mockGoogleRequestedScopes = '';
-    window.mockGoogleValidatedScopes = [];
-    window.mockGooglePopupClosed = false;
-    window.google = {
-      accounts: {
-        oauth2: {
-          hasGrantedAllScopes: (_response, ...scopes) => {
-            window.mockGoogleValidatedScopes = scopes;
-            return true;
-          },
-          initTokenClient: (config) => {
-            window.mockGoogleRequestedScopes = config.scope;
-            return {
-              requestAccessToken: () => {
-                if (window.mockGooglePopupClosed) {
-                  window.mockGooglePopupClosed = false;
-                  config.error_callback({ type: 'popup_closed' });
-                  return;
-                }
-                config.callback({
-                  access_token: `test-${window.mockGoogleSub}`,
-                  expires_in: 3600,
-                });
+  await context.addInitScript(
+    ({ sub, preloadGoogle }) => {
+      window.mockGoogleSub = sub;
+      window.mockGoogleRequestedScopes = '';
+      window.mockGoogleValidatedScopes = [];
+      window.mockGooglePopupClosed = false;
+      window.installMockGoogle = () => {
+        window.google = {
+          accounts: {
+            oauth2: {
+              hasGrantedAllScopes: (_response, ...scopes) => {
+                window.mockGoogleValidatedScopes = scopes;
+                return true;
               },
-            };
+              initTokenClient: (config) => {
+                window.mockGoogleRequestedScopes = config.scope;
+                return {
+                  requestAccessToken: () => {
+                    if (window.mockGooglePopupClosed) {
+                      window.mockGooglePopupClosed = false;
+                      config.error_callback({ type: 'popup_closed' });
+                      return;
+                    }
+                    config.callback({
+                      access_token: `test-${window.mockGoogleSub}`,
+                      expires_in: 3600,
+                    });
+                  },
+                };
+              },
+            },
           },
-        },
-      },
-    };
-  }, sub);
+        };
+      };
+      if (preloadGoogle) window.installMockGoogle();
+    },
+    { sub, preloadGoogle },
+  );
   await context.route('https://**googleapis.com/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -126,9 +137,7 @@ async function login(page) {
     'email',
     'https://www.googleapis.com/auth/drive.appdata',
   ]);
-  expect(
-    await page.evaluate(() => window.mockGoogleValidatedScopes),
-  ).toEqual([
+  expect(await page.evaluate(() => window.mockGoogleValidatedScopes)).toEqual([
     'openid',
     'email',
     'https://www.googleapis.com/auth/drive.appdata',
@@ -314,6 +323,103 @@ test('popup_closed leaves the account disconnected and allows retry', async ({
   await expect(
     page.getByText('保存先：111@example.com', { exact: true }),
   ).toBeVisible();
+});
+
+test('failed Google auth script load can be retried after network recovery', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  let attempts = 0;
+  await setup(context, server, '111', { preloadGoogle: false });
+  await context.route(
+    'https://accounts.google.com/gsi/client',
+    async (route) => {
+      attempts += 1;
+      if (attempts === 1) return route.abort('failed');
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: 'window.installMockGoogle();',
+      });
+    },
+  );
+
+  await page.goto('./');
+  await page.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
+  const connect = page.getByRole('button', {
+    name: 'Googleで接続',
+    exact: true,
+  });
+  await expect(
+    page.getByText('Google認証の準備に失敗しました。'),
+  ).toBeVisible();
+  await expect(connect).toBeDisabled();
+  await page.getByRole('button', { name: '再試行', exact: true }).click();
+  await expect(connect).toBeEnabled();
+  expect(attempts).toBe(2);
+
+  await connect.click();
+  await expect(
+    page.getByText('保存先：111@example.com', { exact: true }),
+  ).toBeVisible();
+});
+
+test('Google auth script timeout allows a new load attempt', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  let attempts = 0;
+  let releaseHangingRequest;
+  let hangingRequestEnded = false;
+  await setup(context, server, '111', { preloadGoogle: false });
+  await context.route(
+    'https://accounts.google.com/gsi/client',
+    async (route) => {
+      attempts += 1;
+      if (attempts === 1) {
+        await new Promise((resolve) => {
+          releaseHangingRequest = resolve;
+        });
+        await route.abort().catch(() => {});
+        hangingRequestEnded = true;
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: 'window.installMockGoogle();',
+      });
+    },
+  );
+  await page.clock.install();
+
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
+  await expect(
+    page.getByRole('region', { name: 'Google Drive同期' }).getByRole('status'),
+  ).toHaveText('Google認証を準備しています…');
+  try {
+    await expect.poll(() => attempts).toBe(1);
+    await page.clock.fastForward(15_001);
+    await expect(
+      page.getByText('Google認証の準備に失敗しました。'),
+    ).toBeVisible();
+    expect(attempts).toBe(1);
+
+    // End the stalled request to model network recovery before retrying.
+    // Browsers may coalesce identical script URLs while the first is pending.
+    releaseHangingRequest();
+    await expect.poll(() => hangingRequestEnded).toBe(true);
+    await page.getByRole('button', { name: '再試行', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'Googleで接続', exact: true }),
+    ).toBeEnabled();
+    expect(attempts).toBe(2);
+  } finally {
+    releaseHangingRequest?.();
+  }
 });
 
 test('storage quota failure while saving keeps local decks and does not complete sync', async ({

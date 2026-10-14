@@ -39,6 +39,17 @@ function isStoredDeck(value: unknown): value is Deck {
   );
 }
 
+function pilesEqual(
+  left: Record<string, number>,
+  right: Record<string, number>,
+): boolean {
+  const leftIds = Object.keys(left);
+  return (
+    leftIds.length === Object.keys(right).length &&
+    leftIds.every((id) => left[id] === right[id])
+  );
+}
+
 function cloneStoredDeck(deck: Deck, isSaved: boolean): Deck | null {
   const main = migrateCardIdsInPile(deck.main);
   const side = migrateCardIdsInPile(deck.side);
@@ -112,7 +123,8 @@ export function loadStoredArchive(
     if (!isStoredDeck(archive.draft)) return blocked(raw, 'invalid-data');
     const decks = archive.decks.map((deck) => cloneStoredDeck(deck, true));
     const draft = cloneStoredDeck(archive.draft, false);
-    if (decks.some((deck) => deck === null) || !draft) {
+    const savedDecks = decks.filter((deck): deck is Deck => deck !== null);
+    if (savedDecks.length !== decks.length || !draft) {
       return blocked(raw, 'invalid-data');
     }
     let sync: LocalSyncState | undefined;
@@ -131,34 +143,30 @@ export function loadStoredArchive(
             !Number.isFinite(Date.parse(stored.lastSyncedAt)))
         )
           return blocked(raw, 'invalid-data');
-        const active = checked.records
-          .filter((r) => r.state === 'active')
-          .map((r) => r.deck);
+        const active = checked.records.filter((r) => r.state === 'active');
+        const deckIds = new Set(savedDecks.map((deck) => deck.id));
+        const activeById = new Map<string, Deck | undefined>(
+          active.map((record): [string, Deck | undefined] => [
+            record.id,
+            record.deck,
+          ]),
+        );
         if (
-          active.length !== decks.length ||
-          decks.some(
-            (d) =>
-              !active.some(
-                (a) =>
-                  a &&
-                  d &&
-                  a.id === d.id &&
-                  JSON.stringify([
-                    a.name,
-                    a.main,
-                    a.side,
-                    a.color ?? 'default',
-                    a.updatedAt,
-                  ]) ===
-                    JSON.stringify([
-                      d.name,
-                      d.main,
-                      d.side,
-                      d.color ?? 'default',
-                      d.updatedAt,
-                    ]),
-              ),
-          )
+          deckIds.size !== savedDecks.length ||
+          active.length !== savedDecks.length ||
+          activeById.size !== active.length ||
+          active.some((record) => !deckIds.has(record.id)) ||
+          savedDecks.some((deck) => {
+            const activeDeck = activeById.get(deck.id);
+            return (
+              !activeDeck ||
+              activeDeck.name !== deck.name ||
+              !pilesEqual(activeDeck.main, deck.main) ||
+              !pilesEqual(activeDeck.side, deck.side) ||
+              (activeDeck.color ?? 'default') !== (deck.color ?? 'default') ||
+              activeDeck.updatedAt !== deck.updatedAt
+            );
+          })
         )
           return blocked(raw, 'invalid-data');
         sync = {
@@ -173,7 +181,7 @@ export function loadStoredArchive(
     return {
       status: 'ready',
       source: archive.version === 3 ? 'v3' : 'v2',
-      decks: decks.filter((deck): deck is Deck => deck !== null),
+      decks: savedDecks,
       draft,
       ...(sync ? { sync } : {}),
     };

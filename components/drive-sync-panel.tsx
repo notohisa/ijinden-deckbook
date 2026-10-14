@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { useDeckBook } from '@/hooks/use-deck-book';
 import { syncKey, type ReadyArchive } from '@/lib/deck-archive-repository';
 import { loadStoredArchive, localStorageKey } from '@/lib/deck-storage';
@@ -61,28 +61,37 @@ export function DriveSyncPanel({
   onDisconnect,
   notify,
 }: Props) {
-  const [authReady, setAuthReady] = useState(false);
+  const [authLoadState, setAuthLoadState] = useState<
+    'preparing' | 'ready' | 'failed'
+  >('preparing');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [plan, setPlan] = useState<Plan | null>(null);
   const [choices, setChoices] = useState<Record<string, number | 'both'>>({});
   const alive = useRef(true);
   const running = useRef(false);
+  const prepareAuth = useCallback(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+    setAuthLoadState('preparing');
+    setError('');
+    void loadGoogleAuth()
+      .then(() => {
+        if (alive.current) setAuthLoadState('ready');
+      })
+      .catch((cause: unknown) => {
+        if (!alive.current) return;
+        setAuthLoadState('failed');
+        setError(message(cause));
+      });
+  }, []);
   /* oxlint-disable react/react-compiler -- Load the external Google authorization library only when this panel is mounted. */
   useEffect(() => {
     alive.current = true;
-    if (GOOGLE_CLIENT_ID)
-      void loadGoogleAuth()
-        .then(() => {
-          if (alive.current) setAuthReady(true);
-        })
-        .catch((cause: unknown) => {
-          if (alive.current) setError(message(cause));
-        });
+    prepareAuth();
     return () => {
       alive.current = false;
     };
-  }, []);
+  }, [prepareAuth]);
   /* oxlint-enable react/react-compiler */
 
   function assertSession(): GoogleSession {
@@ -311,9 +320,20 @@ export function DriveSyncPanel({
           Google接続は準備中です。管理者の設定後に利用できます。
         </p>
       )}
+      {GOOGLE_CLIENT_ID && authLoadState === 'preparing' && (
+        <output className="mt-2 block">Google認証を準備しています…</output>
+      )}
+      {GOOGLE_CLIENT_ID && authLoadState === 'failed' && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p>Google認証の準備に失敗しました。</p>
+          <Button variant="outline" disabled={busy} onClick={prepareAuth}>
+            再試行
+          </Button>
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
-          disabled={busy || !authReady || book.pendingWrites > 0}
+          disabled={busy || authLoadState !== 'ready' || book.pendingWrites > 0}
           onClick={connect}
         >
           {scope ? 'Googleに接続' : 'Googleで接続'}

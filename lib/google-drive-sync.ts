@@ -15,6 +15,7 @@ const UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3';
 const FILE_PREFIX = 'ijinden-deckbook-sync-';
 const SUPPORTED_PREFIX = 'ijinden-deckbook-sync-v1-';
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_TOTAL_READ_BYTES = 10 * 1024 * 1024;
 const MAX_WRITERS = 100;
 const MAX_FILES = 500;
 const PAGE_SIZE = 100;
@@ -42,6 +43,87 @@ export class GoogleDriveSyncError extends Error {
     super(message, options);
     this.name = 'GoogleDriveSyncError';
     this.status = status;
+  }
+}
+
+type ReadBudget = {
+  bytesRead: number;
+  controller: AbortController;
+  readers: Set<ReadableStreamDefaultReader<Uint8Array>>;
+  error?: GoogleDriveSyncError;
+};
+
+function abortReadBudget(
+  budget: ReadBudget,
+  error: GoogleDriveSyncError,
+  body?: ReadableStream<Uint8Array> | null,
+): GoogleDriveSyncError {
+  if (!budget.error) {
+    budget.error = error;
+    budget.controller.abort(error);
+  }
+  for (const reader of budget.readers) {
+    void reader.cancel(budget.error).catch(() => {});
+  }
+  if (body && !body.locked) void body.cancel(budget.error).catch(() => {});
+  return budget.error;
+}
+
+async function readResponseText(
+  response: Response,
+  budget: ReadBudget,
+): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  budget.readers.add(reader);
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  let fileBytesRead = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const nextFileBytes = fileBytesRead + value.byteLength;
+      if (nextFileBytes > MAX_FILE_BYTES) {
+        throw abortReadBudget(
+          budget,
+          new GoogleDriveSyncError(
+            'Google Driveの同期ファイルがサイズ上限を超えています。',
+          ),
+        );
+      }
+      const nextTotalBytes = budget.bytesRead + value.byteLength;
+      if (nextTotalBytes > MAX_TOTAL_READ_BYTES) {
+        throw abortReadBudget(
+          budget,
+          new GoogleDriveSyncError(
+            'Google Driveから読み取る同期データの合計が上限を超えています。',
+          ),
+        );
+      }
+      fileBytesRead = nextFileBytes;
+      budget.bytesRead = nextTotalBytes;
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+    chunks.push(decoder.decode());
+    return chunks.join('');
+  } catch (error) {
+    if (budget.error) throw budget.error;
+    if (error instanceof GoogleDriveSyncError) {
+      throw abortReadBudget(budget, error);
+    }
+    throw new GoogleDriveSyncError(
+      'Google Driveの同期ファイルを読み取れませんでした。',
+      undefined,
+      { cause: error },
+    );
+  } finally {
+    budget.readers.delete(reader);
+    try {
+      reader.releaseLock();
+    } catch {
+      // A cancelled reader may already have released its lock.
+    }
   }
 }
 
@@ -241,10 +323,14 @@ export function createDriveClient(
     try {
       const headers = new Headers(init.headers);
       headers.set('Authorization', `Bearer ${accessToken}`);
+      const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+      const signal = init.signal
+        ? AbortSignal.any([timeoutSignal, init.signal])
+        : timeoutSignal;
       const response = await fetcher(url, {
         ...init,
         headers,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal,
       });
       if (!response.ok) throw await responseError(response);
       return response;
@@ -345,73 +431,93 @@ export function createDriveClient(
 
   async function readFile(
     file: { id: string; writerId: string },
+    budget: ReadBudget,
     knownCardIds?: ReadonlySet<string>,
   ): Promise<SyncSnapshot> {
-    const response = await request(
-      `${API_BASE}/files/${encodeURIComponent(file.id)}?alt=media`,
-      { method: 'GET' },
-    );
-    const contentLength = response.headers.get('content-length');
-    if (contentLength && Number(contentLength) > MAX_FILE_BYTES) {
-      throw new GoogleDriveSyncError(
-        'Google Driveの同期ファイルがサイズ上限を超えています。',
-      );
-    }
-    let text: string;
     try {
-      text = await response.text();
+      const response = await request(
+        `${API_BASE}/files/${encodeURIComponent(file.id)}?alt=media`,
+        { method: 'GET', signal: budget.controller.signal },
+      );
+      if (budget.error) throw budget.error;
+      const contentLength = Number(response.headers.get('content-length'));
+      if (Number.isFinite(contentLength) && contentLength > MAX_FILE_BYTES) {
+        throw abortReadBudget(
+          budget,
+          new GoogleDriveSyncError(
+            'Google Driveの同期ファイルがサイズ上限を超えています。',
+          ),
+          response.body,
+        );
+      }
+      const text = await readResponseText(response, budget);
+      let value: unknown;
+      try {
+        value = JSON.parse(text);
+      } catch (error) {
+        throw new GoogleDriveSyncError(
+          'Google Driveの同期ファイルが壊れているため、安全のため同期を停止しました。',
+          undefined,
+          { cause: error },
+        );
+      }
+      const snapshot = validateSnapshot(value, knownCardIds);
+      if (snapshot.writerId !== file.writerId) {
+        throw new GoogleDriveSyncError(
+          'Google Driveの同期ファイルと端末IDが一致しません。',
+        );
+      }
+      return snapshot;
     } catch (error) {
-      throw new GoogleDriveSyncError(
-        'Google Driveの同期ファイルを読み取れませんでした。',
-        undefined,
-        { cause: error },
-      );
+      if (budget.error) throw budget.error;
+      const readError =
+        error instanceof GoogleDriveSyncError
+          ? error
+          : error instanceof Error
+            ? new GoogleDriveSyncError(error.message, undefined, {
+                cause: error,
+              })
+            : new GoogleDriveSyncError(
+                'Google Driveの同期ファイルを読み取れませんでした。',
+                undefined,
+                { cause: error },
+              );
+      throw abortReadBudget(budget, readError);
     }
-    if (utf8ByteLength(text) > MAX_FILE_BYTES) {
-      throw new GoogleDriveSyncError(
-        'Google Driveの同期ファイルがサイズ上限を超えています。',
-      );
-    }
-    let value: unknown;
-    try {
-      value = JSON.parse(text);
-    } catch (error) {
-      throw new GoogleDriveSyncError(
-        'Google Driveの同期ファイルが壊れているため、安全のため同期を停止しました。',
-        undefined,
-        { cause: error },
-      );
-    }
-    const snapshot = validateSnapshot(value, knownCardIds);
-    if (snapshot.writerId !== file.writerId) {
-      throw new GoogleDriveSyncError(
-        'Google Driveの同期ファイルと端末IDが一致しません。',
-      );
-    }
-    return snapshot;
   }
 
   return {
     async readAll(knownCardIds) {
       knownFiles.clear();
       const files = await listFiles();
+      const budget: ReadBudget = {
+        bytesRead: 0,
+        controller: new AbortController(),
+        readers: new Set(),
+      };
       const snapshotsByIndex = new Map<number, SyncSnapshot>();
       let nextIndex = 0;
       const workers = Array.from(
         { length: Math.min(READ_CONCURRENCY, files.length) },
         async () => {
           while (true) {
+            if (budget.error) throw budget.error;
             const index = nextIndex;
             nextIndex += 1;
             if (index >= files.length) return;
             snapshotsByIndex.set(
               index,
-              await readFile(files[index], knownCardIds),
+              await readFile(files[index], budget, knownCardIds),
             );
           }
         },
       );
-      await Promise.all(workers);
+      const workerResults = await Promise.allSettled(workers);
+      if (budget.error) throw budget.error;
+      const failedWorker = workerResults.find(
+        (result) => result.status === 'rejected',
+      );
+      if (failedWorker?.status === 'rejected') throw failedWorker.reason;
       const snapshots: SyncSnapshot[] = [];
       for (let index = 0; index < files.length; index += 1) {
         const snapshot = snapshotsByIndex.get(index);

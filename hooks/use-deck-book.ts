@@ -313,11 +313,15 @@ export function useDeckBook(
       };
     });
     if (saved !== undefined) {
-      updateActiveDeck((deck) => ({
-        ...deck,
-        sourceId: saved.id,
-        sourceUpdatedAt: saved.updatedAt,
-      }));
+      // A queued save may finish after the user opens or creates another draft.
+      // Only attach the saved destination to the draft that was actually saved.
+      if (draft.current.id === current.id) {
+        updateActiveDeck((deck) => ({
+          ...deck,
+          sourceId: saved.id,
+          sourceUpdatedAt: saved.updatedAt,
+        }));
+      }
       notify(
         '「' +
           (saved.name || '名前のないデッキ') +
