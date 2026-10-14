@@ -47,7 +47,7 @@ export const GOOGLE_CLIENT_ID =
 
 const GIS_URL = 'https://accounts.google.com/gsi/client';
 const USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
-const USER_SCOPES = ['openid', 'email', 'profile'];
+const USER_SCOPES = ['openid', 'email'];
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const REQUESTED_SCOPES = [...USER_SCOPES, DRIVE_SCOPE];
 const AUTH_TIMEOUT_MS = 120_000;
@@ -69,7 +69,7 @@ function authError(message: string, cause?: unknown): Error {
 }
 
 function authErrorForPopup(type = ''): Error {
-  if (type === 'popup_closed_by_user') {
+  if (type === 'popup_closed' || type === 'popup_closed_by_user') {
     return authError('Google認証がキャンセルされました。');
   }
   if (type === 'popup_failed_to_open') {

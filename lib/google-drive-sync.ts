@@ -67,7 +67,7 @@ function errorForStatus(status: number, reason = ''): GoogleDriveSyncError {
     normalizedReason.includes('storage_quota')
   ) {
     return new GoogleDriveSyncError(
-      'Google Driveの保存容量が不足しています。空き容量を確保してから再試行してください。',
+      'Google Driveの保存容量が不足しています。',
       status,
     );
   }

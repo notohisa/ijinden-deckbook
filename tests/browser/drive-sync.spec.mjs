@@ -9,23 +9,45 @@ test.setTimeout(180_000);
 const accountKey = `${key}:google:111`;
 
 function cloud() {
-  return { files: new Map(), writes: 0, nextId: 1, fail: 0 };
+  return {
+    files: new Map(),
+    writes: 0,
+    nextId: 1,
+    fail: 0,
+    failReason: 'rateLimitExceeded',
+    failMethod: undefined,
+  };
 }
 async function setup(context, server, sub = '111') {
   await seed(context);
   await context.addInitScript((sub) => {
     window.mockGoogleSub = sub;
+    window.mockGoogleRequestedScopes = '';
+    window.mockGoogleValidatedScopes = [];
+    window.mockGooglePopupClosed = false;
     window.google = {
       accounts: {
         oauth2: {
-          hasGrantedAllScopes: () => true,
-          initTokenClient: ({ callback }) => ({
-            requestAccessToken: () =>
-              callback({
-                access_token: `test-${window.mockGoogleSub}`,
-                expires_in: 3600,
-              }),
-          }),
+          hasGrantedAllScopes: (_response, ...scopes) => {
+            window.mockGoogleValidatedScopes = scopes;
+            return true;
+          },
+          initTokenClient: (config) => {
+            window.mockGoogleRequestedScopes = config.scope;
+            return {
+              requestAccessToken: () => {
+                if (window.mockGooglePopupClosed) {
+                  window.mockGooglePopupClosed = false;
+                  config.error_callback({ type: 'popup_closed' });
+                  return;
+                }
+                config.callback({
+                  access_token: `test-${window.mockGoogleSub}`,
+                  expires_in: 3600,
+                });
+              },
+            };
+          },
         },
       },
     };
@@ -42,9 +64,12 @@ async function setup(context, server, sub = '111') {
       });
     if (url.hostname === 'openidconnect.googleapis.com')
       return respond({ sub: owner, email: `${owner}@example.com` });
-    if (server.fail)
+    if (
+      server.fail &&
+      (!server.failMethod || request.method() === server.failMethod)
+    )
       return respond(
-        { error: { errors: [{ reason: 'rateLimitExceeded' }] } },
+        { error: { errors: [{ reason: server.failReason }] } },
         server.fail,
       );
     if (request.method() === 'GET' && url.pathname === '/drive/v3/files')
@@ -94,6 +119,20 @@ async function login(page) {
   await expect(
     page.getByText('保存先：111@example.com', { exact: true }),
   ).toBeVisible();
+  expect(
+    await page.evaluate(() => window.mockGoogleRequestedScopes.split(' ')),
+  ).toEqual([
+    'openid',
+    'email',
+    'https://www.googleapis.com/auth/drive.appdata',
+  ]);
+  expect(
+    await page.evaluate(() => window.mockGoogleValidatedScopes),
+  ).toEqual([
+    'openid',
+    'email',
+    'https://www.googleapis.com/auth/drive.appdata',
+  ]);
 }
 async function sync(page) {
   await page
@@ -247,6 +286,65 @@ test('concurrent edits require a choice and preserve both versions', async ({
   } finally {
     await otherContext.close();
   }
+});
+
+test('popup_closed leaves the account disconnected and allows retry', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  await setup(context, server);
+  await page.goto('./');
+  await page.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
+  await page.evaluate(() => {
+    window.mockGooglePopupClosed = true;
+  });
+  await page.getByRole('button', { name: 'Googleで接続', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText(
+    'Google認証がキャンセルされました。',
+  );
+  await expect(
+    page.getByText('保存先：この端末のみ', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Googleで接続', exact: true }),
+  ).toBeEnabled();
+
+  await page.getByRole('button', { name: 'Googleで接続', exact: true }).click();
+  await expect(
+    page.getByText('保存先：111@example.com', { exact: true }),
+  ).toBeVisible();
+});
+
+test('storage quota failure while saving keeps local decks and does not complete sync', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  await setup(context, server);
+  await login(page);
+  await importLocal(page);
+  const before = await archive(page);
+  const writes = server.writes;
+
+  server.fail = 403;
+  server.failReason = 'storageQuotaExceeded';
+  server.failMethod = 'POST';
+  await page
+    .getByRole('button', { name: '同期内容を確認', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog', { name: '同期内容の確認' });
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByRole('button', { name: 'この内容で同期', exact: true })
+    .click();
+
+  await expect(dialog.getByRole('alert')).toHaveText(
+    'Google Driveの保存容量が不足しています。',
+  );
+  await expect(dialog).toBeVisible();
+  expect(await archive(page)).toEqual(before);
+  expect(server.writes).toBe(writes);
 });
 
 test('quota failures and newer cloud formats never erase local decks or report success', async ({

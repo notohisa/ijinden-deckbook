@@ -281,7 +281,11 @@ test('401 authentication and 403 storage errors have clear messages', async (t) 
       );
     await assert.rejects(
       createDriveClient('test-token', fetcher).readAll(),
-      /保存容量/u,
+      (error) => {
+        assert.ok(error instanceof GoogleDriveSyncError);
+        assert.equal(error.message, 'Google Driveの保存容量が不足しています。');
+        return true;
+      },
     );
   });
 });

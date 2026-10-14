@@ -303,6 +303,9 @@ export function DriveSyncPanel({
         自分のGoogle
         Driveで、保存済みマイデッキすべてとゴミ箱を同期します。作業中のレシピは端末ごとに保存します。
       </p>
+      <p className="mt-2 text-xs text-[var(--muted)]">
+        同期は任意・手動です。ページの再読み込み後や認証の有効期限が切れた場合は、Googleへの再接続が必要です。
+      </p>
       {!GOOGLE_CLIENT_ID && (
         <p className="mt-2">
           Google接続は準備中です。管理者の設定後に利用できます。
@@ -355,6 +358,20 @@ export function DriveSyncPanel({
       {scope && !session && (
         <p className="mt-2 text-xs">
           端末内のデッキを表示しています。同期するにはGoogleに再接続してください。
+        </p>
+      )}
+      {scope && (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          ログアウトしても端末内のデッキは残ります。共用端末では、利用後に
+          <a
+            className="underline"
+            href={`${import.meta.env.BASE_URL ?? '/'}privacy.html#local-data`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            端末内データの消去方法
+          </a>
+          を確認してください。
         </p>
       )}
       <a
