@@ -9,7 +9,9 @@
 - データアクセスは `openid`、`https://www.googleapis.com/auth/userinfo.email`（コード側の `email` に対応）、`https://www.googleapis.com/auth/drive.appdata` の3つだけを保存しました。`profile` は含めていません。
 - 「イジンデン デッキ帳 Web テスト」を作成しました。許可するJavaScript生成元は、下記の管理者設定に列挙する5つです。リダイレクトURIは設定していません。
 - 公開クライアントIDを未追跡の `.env.local` に設定し、ローカルのPagesビルドと「Googleで接続」ボタンの有効化を確認しました。クライアントシークレットはアプリへ保存・使用していません。
-- 実際のGoogleログイン・Drive保存は未検証です。用途適合の確認と一般公開に必要な設定は未完了で、Googleへの問い合わせも未送信です。公開サイトへの反映や請求先の紐づけは行っていません。
+- 実際のGoogleログイン・Drive保存は未検証です。一般公開に必要な設定は未完了で、Googleへの問い合わせも未送信です。公開サイトへの反映や請求先の紐づけは行っていません。
+- 管理者の判断により、用途適合の事前照会を公開準備の待ち条件から外します。Googleから指摘があった場合に対応する運用方針です。Googleによる用途の許可・規約適合の確認が得られたことを意味しません。問い合わせの公開投稿は行いません。
+- 公開準備の再確認では、承認済みドメインに `notohisa.github.io` が登録済みでした。ホームページ・プライバシーポリシーのURLは未設定で、「アプリを公開」はブランディング未完了のため無効です。公開先の `/ijinden-deckbook/privacy.html` は404で、作成済みのポリシーはまだ反映されていません。
 
 ## 管理者の設定
 
@@ -35,9 +37,9 @@ pnpm dev:pages --host 127.0.0.1 --port 5173
 ## 一般公開前の確認事項
 
 - 主な想定利用者は成人の友人です。Google同期は任意とし、接続しなくてもデッキ作成・端末保存・JSON入出力を利用できます。
-- [Drive API規約](https://developers.google.com/workspace/drive/api/terms)には、アプリ内のユーザー／アプリコンテンツをDriveへバックアップする用途についてGoogleの事前の書面同意を求める条項があります。appDataFolderの技術資料だけで今回のデッキ同期が適用外とは判断せず、用途の適合を確認してから同期を一般公開します。
+- [Drive API規約](https://developers.google.com/workspace/drive/api/terms)には、アプリ内のユーザー／アプリコンテンツをDriveへバックアップする用途についてGoogleの事前の書面同意を求める条項があります。appDataFolderの技術資料だけで今回のデッキ同期が適用外とは判断できません。管理者はこの未確認事項を把握した上で、事前照会を待たず公開準備を進める方針です。
 - 2026-10-15に規約・[Workspace開発者ポリシー](https://developers.google.com/workspace/workspace-api-user-data-developer-policy)・appDataFolderガイドを照合しました。双方向同期とバックアップの境界や、このデッキ帳が例外になる条件は公開文書から確定できていません。禁止用途に該当すると確定したわけでも、許可が確認できたわけでもありません。
-- [Drive APIの公式サポート案内](https://developers.google.com/workspace/drive/api/support)は、質問先として[Google Workspace Developers公式フォーラム](https://discuss.google.dev/c/google-workspace/20)を案内しています。今回の用途の適用判定と、必要なら事前書面同意を受ける正式な窓口を問い合わせます。公開投稿には認証情報・個人メール・個々のデッキ内容を含めません。コミュニティ回答やOAuth／ブランド審査の通過だけを、Drive API担当による個別の書面同意とは扱いません。
+- [Drive APIの公式サポート案内](https://developers.google.com/workspace/drive/api/support)は、質問先として[Google Workspace Developers公式フォーラム](https://discuss.google.dev/c/google-workspace/20)を案内しています。問い合わせ文は未送信で、現在は投稿しない方針です。後日問い合わせる場合も、コミュニティ回答やOAuth／ブランド審査の通過だけを、Drive API担当による個別の書面同意とは扱いません。
 - ホームページ、プライバシーポリシー、Google同意画面の表示を揃え、必要なブランド審査とドメイン所有確認を完了します。現在の `notohisa.github.io` で手続きが通るかは未確認です。
 - 実際のGoogleアカウントを使ったPC・スマートフォン間の受入テストが必要です。模擬APIのテスト合格を、実Google接続や公開要件の確認済みとして扱いません。
 
