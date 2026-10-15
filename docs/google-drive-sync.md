@@ -2,6 +2,15 @@
 
 初版は手動同期です。マイデッキの「Googleで接続」→「同期内容を確認」→「この内容で同期」で、同じGoogleアカウントを使う自分の端末間で保存済みデッキを共有します。Google OAuthクライアントIDを設定するまで接続ボタンは無効です。Google側の設定、課金状態の確認、実アカウントでの受入確認は管理者が行います。
 
+## 設定状況（2026-10-15）
+
+- Google Cloudの `ijinden-deckbook` で「このプロジェクトには請求先アカウントがありません」と表示され、Drive APIが有効であることを確認しました。
+- 管理者の明示的な同意を受け、Googleユーザーデータポリシーに同意してOAuth構成を作成しました。アプリ名は「イジンデン デッキ帳」、外部・テスト中で、管理者本人1アカウントだけをテストユーザーに登録しています。
+- データアクセスは `openid`、`https://www.googleapis.com/auth/userinfo.email`（コード側の `email` に対応）、`https://www.googleapis.com/auth/drive.appdata` の3つだけを保存しました。`profile` は含めていません。
+- 「イジンデン デッキ帳 Web テスト」を作成しました。許可するJavaScript生成元は、下記の管理者設定に列挙する5つです。リダイレクトURIは設定していません。
+- 公開クライアントIDを未追跡の `.env.local` に設定し、ローカルのPagesビルドと「Googleで接続」ボタンの有効化を確認しました。クライアントシークレットはアプリへ保存・使用していません。
+- 実際のGoogleログイン・Drive保存は未検証です。用途適合の確認と一般公開に必要な設定は未完了で、Googleへの問い合わせも未送信です。公開サイトへの反映や請求先の紐づけは行っていません。
+
 ## 管理者の設定
 
 1. Google Cloudに同期専用プロジェクトを作成します。**請求先アカウントは紐づけません。無料トライアル・有料枠への移行は不要です。** Billing画面で「このプロジェクトには請求先アカウントがありません」を確認します。Google Cloudの別プロジェクトに支払方法があっても、このプロジェクトの紐づけを個別に確認してください。
@@ -27,6 +36,8 @@ pnpm dev:pages --host 127.0.0.1 --port 5173
 
 - 主な想定利用者は成人の友人です。Google同期は任意とし、接続しなくてもデッキ作成・端末保存・JSON入出力を利用できます。
 - [Drive API規約](https://developers.google.com/workspace/drive/api/terms)には、アプリ内のユーザー／アプリコンテンツをDriveへバックアップする用途についてGoogleの事前の書面同意を求める条項があります。appDataFolderの技術資料だけで今回のデッキ同期が適用外とは判断せず、用途の適合を確認してから同期を一般公開します。
+- 2026-10-15に規約・[Workspace開発者ポリシー](https://developers.google.com/workspace/workspace-api-user-data-developer-policy)・appDataFolderガイドを照合しました。双方向同期とバックアップの境界や、このデッキ帳が例外になる条件は公開文書から確定できていません。禁止用途に該当すると確定したわけでも、許可が確認できたわけでもありません。
+- [Drive APIの公式サポート案内](https://developers.google.com/workspace/drive/api/support)は、質問先として[Google Workspace Developers公式フォーラム](https://discuss.google.dev/c/google-workspace/20)を案内しています。今回の用途の適用判定と、必要なら事前書面同意を受ける正式な窓口を問い合わせます。公開投稿には認証情報・個人メール・個々のデッキ内容を含めません。コミュニティ回答やOAuth／ブランド審査の通過だけを、Drive API担当による個別の書面同意とは扱いません。
 - ホームページ、プライバシーポリシー、Google同意画面の表示を揃え、必要なブランド審査とドメイン所有確認を完了します。現在の `notohisa.github.io` で手続きが通るかは未確認です。
 - 実際のGoogleアカウントを使ったPC・スマートフォン間の受入テストが必要です。模擬APIのテスト合格を、実Google接続や公開要件の確認済みとして扱いません。
 
