@@ -668,6 +668,13 @@ function DeckBookPage({
           非公式のデッキ作成補助アプリです。デッキは端末に保存し、希望する場合は自分のGoogle
           Driveと同期できます。
         </span>
+        {/* oxlint-disable-next-line next/no-html-link-for-pages -- The policy is a static public HTML file outside Next routes and needs full-page navigation. */}
+        <a
+          href="./privacy.html"
+          className="ml-3 underline underline-offset-2 hover:text-[var(--ink)]"
+        >
+          プライバシーポリシー
+        </a>
       </footer>
     </main>
   );

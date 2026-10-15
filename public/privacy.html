@@ -1,16 +1,123 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>プライバシーポリシー | イジンデン デッキ帳</title><style>body{max-width:46rem;margin:3rem auto;padding:0 1.2rem;font-family:system-ui,sans-serif;line-height:1.9;color:#22332c;background:#f7f5ec}h1{font-size:1.6rem}h2{font-size:1.15rem;margin-top:2rem}a{color:#176148}</style></head><body>
-<h1>イジンデン デッキ帳 プライバシーポリシー</h1><p>更新日：2026年10月14日</p>
-<h2>端末内の保存</h2><p>デッキ、作業中のレシピ、表示設定はブラウザの保存領域に保存します。ブラウザのデータ消去によって失われる場合があります。</p>
-<h2>Google Drive同期</h2><p>同期は任意・手動です。Googleに接続しなくても、デッキ作成・端末保存・JSONの書き出しと読み込みを利用できます。接続時にGoogleアカウントの識別子とメールアドレスを取得し、保存領域の区別と接続先の表示に使用します。名前やプロフィール画像を取得するための権限は要求しません。保存済みデッキの名前・色・カードIDと枚数、ゴミ箱、同期履歴は、利用者本人のGoogle Driveのアプリ専用領域へ直接送信します。カード画像や作業中のレシピは送信しません。ほかのDriveファイルを読み取る権限は要求しません。</p>
-<p>運営者のデータベースにGoogleアカウント情報やデッキを集める仕組みはありません。Googleへのアクセス用トークンはページのメモリだけに保持し、ブラウザの永続保存領域には記録しません。アカウント識別子とメールアドレスは、このタブで保存先を復元するために使用します。</p>
-<h2>削除・バックアップ・接続解除</h2><p>通常の削除はアプリ内のゴミ箱へ移動します。削除がDriveに保存されてから30日後、次の同期でアプリ上から完全削除します。手動の完全削除もできます。古い端末からの復活を防ぐため、デッキ内容を含まないIDと変更履歴を保持します。同期前バックアップ、別端末の未同期コピー、Driveの過去バージョンは直ちに消去されるとは限りません。</p>
-<p>ログアウトしてもデッキは消えません。Googleアカウントの「サードパーティとの接続」からアクセス許可を取り消せます。Driveに保存したアプリデータ全体はGoogle Driveのアプリ管理から削除できます。端末内のデータはブラウザのサイトデータ設定から消去できます。</p>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>プライバシーポリシー | イジンデン デッキ帳</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  body {
+    max-width: 46rem;
+    margin: 2rem auto;
+    padding: 0 1.25rem 3.5rem;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    line-height: 1.85;
+    color: #22332c;
+    background-color: #f7f5ec;
+    word-break: break-word;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin: 0 0 0.5rem;
+    color: #176148;
+    line-height: 1.4;
+  }
+  .date {
+    font-size: 0.9rem;
+    color: #556b61;
+    margin-bottom: 2rem;
+  }
+  h2 {
+    font-size: 1.18rem;
+    margin: 2.2rem 0 0.8rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 2px solid #d2ded7;
+    color: #176148;
+  }
+  p {
+    margin: 0.8rem 0;
+  }
+  ul, ol {
+    margin: 0.8rem 0;
+    padding-left: 1.4rem;
+  }
+  li {
+    margin-bottom: 0.4rem;
+  }
+  code {
+    background: #e9e5d8;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: Consolas, Monaco, monospace;
+  }
+  a {
+    color: #176148;
+  }
+  a:hover {
+    color: #0d3d2c;
+  }
+  .status-notice {
+    background-color: #e6f0ec;
+    border-left: 4px solid #176148;
+    padding: 0.8rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+    font-weight: 500;
+  }
+  .footer-nav {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #dcd7c9;
+  }
+</style>
+</head>
+<body>
+<h1>イジンデン デッキ帳 プライバシーポリシー</h1>
+<p class="date">更新日：2026年10月15日</p>
+
+<p>「イジンデン デッキ帳」は個人が無料で運営するデッキ作成サイトです。本サイトの利用にあたってユーザーから料金を徴収することはありません。現在、端末内のデータ保存、JSONファイルの書き出し・読み込み、共有リンクの作成・閲覧などの機能をそのままご利用いただけます。</p>
+
+<h2>端末内の保存</h2>
+<p>作成したデッキ、作業中のレシピ、表示設定は、お使いのブラウザの保存領域に保存されます。なお、ブラウザのデータ消去機能によって保存データが失われる場合があります。</p>
+
+<h2>Google Drive同期</h2>
+<p id="sync-availability" class="status-notice">Google Drive同期は公開準備中です。以下は、提供開始後にこの機能を利用する場合の説明です。</p>
+<p>Google Drive同期の利用は任意であり、操作も手動で行います。Googleアカウントと接続しなくても、デッキ作成、端末保存、JSONの書き出し・読み込み、共有リンク等はすべて利用可能です。</p>
+<p>Google Drive同期機能で要求する権限は、アカウント識別用の情報、メールアドレス、およびアプリ専用の保存領域へのアクセス権のみです。利用者の氏名やプロフィール画像を取得するための権限や、Google Drive内の他のファイル・フォルダを読み取る権限（Drive全体へのアクセス権）は要求しません。</p>
+<p>接続時に取得するGoogleアカウント識別子とメールアドレスは、保存領域の区別、接続先アカウントの表示、および開いているタブでの保存先復元のために使用します。提供開始後は、端末内のデッキ保存領域はGoogleアカウント別に分けて管理されます。保存済みデッキの情報（デッキ名・色・カードID・枚数）、アプリ内ゴミ箱、同期履歴は、利用者本人のGoogle Driveにあるアプリ専用領域へ直接送信されます。カード画像や作業中のレシピを送信することはありません。</p>
+<p>運営者のデータベースにGoogleアカウント情報やデッキデータを集約・保管する仕組みはありません。Googleへのアクセス用トークンは開いているページのメモリ上でのみ保持し、ブラウザの永続保存領域には記録しません。</p>
+<p>利用者のGoogle Driveの空き容量が不足している場合は、同期処理をエラーとして同期を中止し、端末内のデッキデータを保持します。本アプリがGoogle Driveの容量追加購入や有料契約の申込みを自動で行うことはありません。</p>
+
+<h2>データの削除と接続解除</h2>
+<p>現在の公開版では、デッキを削除すると端末内の保存一覧から削除されます。必要なデッキは事前にJSONで書き出してください。</p>
+
+<h3>Google Drive同期の提供開始後</h3>
+<p>アプリ内でデッキを削除した場合、まずはアプリ内のゴミ箱へ移動します（Google Driveの通常のゴミ箱フォルダではありません）。ゴミ箱への削除がGoogle Driveに保存（同期）されてから30日経過した後の次回同期時に、アプリ上から完全削除されます。手動で即座に完全削除することも可能です。別の古い端末からの意図しないデータ復活を防ぐため、デッキ本文を含まないIDと変更履歴のデータは保持されます。</p>
+<p>なお、同期前のバックアップ、別端末にある未同期のコピー、Google Drive上に作成された過去のバージョン履歴は、アプリ上の削除操作ですぐに消去されるとは限りません。</p>
+<p>ログアウトしても端末やGoogle Drive内のデッキデータは消えません。Googleアカウントの「サードパーティとの接続」管理画面から本アプリへのアクセス許可を取り消すことができます。Google Driveに保存されたアプリデータ全体は、Google Driveの設定にある「アプリの管理」から削除できます。端末内の保存データは、ブラウザのサイトデータ設定から消去できます。</p>
+
 <h2 id="local-data">共用端末での利用と端末内データの消去</h2>
-<p>ログアウトやGoogleのアクセス許可の取り消しだけでは、端末に保存したデッキや同期前バックアップは消えません。同じブラウザを利用できる人は、端末内の保存データにアクセスできる場合があります。</p>
-<ol><li>必要な保存済みデッキをJSONで書き出し、手元に保管してください。同期していない変更や作業中の内容は、端末データを消すと失われます。</li><li>この端末で開いているデッキ帳のすべてのタブを閉じてください。</li><li>ブラウザの設定からサイトデータを開き、デッキ帳を開いていたサイトのデータを削除してください。公開サイトは <code>notohisa.github.io</code> です。</li></ol>
-<p>この操作は、そのブラウザに保存した全アカウントのデッキ・ゴミ箱・作業中の内容・同期前バックアップ・表示設定を消します。同じサイトのほかのアプリのデータも削除されることがあります。Drive上のデータや別端末のデータは削除されません。</p>
-<h2>公開と外部サービス</h2><p>共有リンクやJSONを他の人へ渡す場合は、その内容を相手が閲覧できます。自分の端末間の同期は公開共有ではありません。サイト配信にGitHub Pages、ログイン・同期にGoogle、カード画像の表示に画像配信元を使用します。これらへの通信には各事業者のポリシーが適用されます。取得したGoogleユーザーデータを広告、販売、AIモデルの学習に使用しません。</p>
-<p>サイトにはCloudflare Web Analyticsの計測スクリプトが含まれ、ページ閲覧数や表示速度などの情報をCloudflareへ送信します。Googleアカウント情報や保存済みデッキを計測スクリプトへ渡す処理は設けていません。計測の詳細は<a href="https://developers.cloudflare.com/web-analytics/about/">Cloudflare Web Analyticsの説明</a>を参照してください。</p>
-<h2>お問い合わせ</h2><p>運営者：notohisa。お問い合わせは<a href="https://github.com/notohisa/ijinden-deckbook/issues">GitHubのIssue</a>へお願いします。Issueは公開されるため、個人情報、トークン、非公開にしたいデッキは投稿しないでください。</p>
-<p><a href="./">デッキ帳へ戻る</a></p></body></html>
+<p>端末内に保存されたデッキデータは、ブラウザを閉じても消去されません。同じ端末・ブラウザを利用できる他の人が、端末内の保存データにアクセスできる状態のまま残る場合があります。提供開始後のGoogle Drive同期においても、ログアウトやGoogleのアクセス許可取り消しによって端末内のデッキや同期前バックアップが消去されることはありません。</p>
+<p>共用端末などで利用した後に端末内データを完全に消去したい場合は、以下の手順を実施してください。</p>
+<ol>
+  <li>必要な保存済みデッキをJSON形式で書き出し、手元に保管してください。作業中の内容（提供開始後は同期していない変更を含む）は、端末データを消去すると失われます。</li>
+  <li>この端末で開いているデッキ帳のすべてのタブを閉じてください。</li>
+  <li>ブラウザの設定からサイトデータを開き、デッキ帳を開いていたサイトのデータを削除してください。公開サイトは <code>notohisa.github.io</code> です。</li>
+</ol>
+<p>この操作を行うと、そのブラウザに保存されたデッキ、作業中の内容、表示設定がすべて消去されます（提供開始後のGoogle Drive同期を利用している場合は、全アカウントのデッキ、ゴミ箱、同期前バックアップも消去されます）。同じサイト（<code>notohisa.github.io</code>）にある他のアプリのデータも同時に削除されることがあります。なお、Google Drive上のデータや別端末のデータは削除されません。</p>
+
+<h2>公開と外部サービス</h2>
+<p>共有リンクを発行したりJSONファイルを他者へ渡したりした場合は、受け取った相手がそのデッキ内容を閲覧できます。なお、提供開始後にご自身の端末間で行うGoogle Drive同期は公開共有ではありません。</p>
+<p>本サイトは、サイト配信にGitHub Pages、カード画像の表示に画像配信元サービスを利用しています。また、提供開始後のGoogle Drive同期ではGoogleを利用します。これらの外部サービスとの通信には、各事業者のポリシーが適用されます。本アプリが取得したGoogleユーザーデータを、広告配信、販売、またはAIモデルの学習に使用することはありません。</p>
+<p>また、本サイトにはCloudflare Web Analyticsの計測スクリプトが含まれており、ページ閲覧数や表示速度などの統計情報をCloudflareへ送信しています。Googleアカウント情報や保存済みデッキのデータを計測スクリプトへ渡す処理は設けていません。計測の仕組みに関する詳細は、<a href="https://developers.cloudflare.com/web-analytics/about/">Cloudflare Web Analyticsの説明</a>を参照してください。</p>
+
+<h2>お問い合わせ</h2>
+<p>運営者：notohisa<br>
+お問い合わせは、<a href="https://github.com/notohisa/ijinden-deckbook/issues">GitHubのIssue</a>へお願いいたします。Issueの内容はインターネット上に公開されますので、個人情報、トークン、非公開にしておきたいデッキ情報などは投稿しないでください。</p>
+
+<p class="footer-nav"><a href="./">デッキ帳へ戻る</a></p>
+</body>
+</html>
