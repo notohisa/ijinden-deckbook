@@ -565,6 +565,13 @@ export default function Home() {
           ✦
           非公式のデッキ作成補助アプリです。デッキデータはこの端末に保存します。
         </span>
+        {/* oxlint-disable-next-line next/no-html-link-for-pages -- The policy is a static public HTML file outside Next routes and needs full-page navigation. */}
+        <a
+          href="./privacy.html"
+          className="ml-3 underline underline-offset-2 hover:text-[var(--ink)]"
+        >
+          プライバシーポリシー
+        </a>
       </footer>
     </main>
   );
