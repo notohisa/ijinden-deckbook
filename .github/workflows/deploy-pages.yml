@@ -7,18 +7,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -53,18 +48,68 @@ jobs:
       - name: Browser regression tests
         run: pnpm test:browser
 
+      - name: Validate optional sync preview settings
+        if: vars.SYNC_PREVIEW_REF != ''
+        env:
+          PREVIEW_REF: ${{ vars.SYNC_PREVIEW_REF }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          [[ "$PREVIEW_REF" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$VITE_GOOGLE_CLIENT_ID" =~ ^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$ ]]
+
+      - name: Check out pinned sync preview
+        if: vars.SYNC_PREVIEW_REF != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ vars.SYNC_PREVIEW_REF }}
+          path: sync-preview-source
+          persist-credentials: false
+
+      - name: Check sync preview source
+        if: vars.SYNC_PREVIEW_REF != ''
+        working-directory: sync-preview-source
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+
+      - name: Build sync preview for isolated storage test
+        if: vars.SYNC_PREVIEW_REF != ''
+        working-directory: sync-preview-source
+        env:
+          VITE_SYNC_PREVIEW: '1'
+          VITE_GOOGLE_CLIENT_ID: test-client.apps.googleusercontent.com
+        run: pnpm build:pages --base /ijinden-deckbook/sync-test/
+
+      - name: Verify sync preview preserves normal site storage
+        if: vars.SYNC_PREVIEW_REF != ''
+        working-directory: sync-preview-source
+        env:
+          PREVIEW_BROWSER_TESTS: '1'
+        run: pnpm exec playwright test tests/browser/sync-preview.spec.mjs
+
+      - name: Build publishable sync preview
+        if: vars.SYNC_PREVIEW_REF != ''
+        working-directory: sync-preview-source
+        env:
+          VITE_SYNC_PREVIEW: '1'
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+        run: pnpm build:pages --base /ijinden-deckbook/sync-test/
+
+      - name: Add sync preview to the normal site
+        if: vars.SYNC_PREVIEW_REF != ''
+        run: node scripts/assemble-sync-preview.mjs
+
       - name: Upload browser failure traces
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: browser-test-results
-          path: test-results
+          path: |
+            test-results
+            sync-preview-source/test-results
           retention-days: 7
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Disable Jekyll processing
         run: touch dist-pages/.nojekyll
@@ -73,6 +118,19 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist-pages
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
 
       - name: Deploy to GitHub Pages
         id: deployment
