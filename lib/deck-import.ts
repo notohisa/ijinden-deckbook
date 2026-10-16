@@ -101,13 +101,23 @@ export function parseDeckImport(
 function findExistingDeck(
   deck: Deck,
   targets: Map<string, Deck>,
-  idsByName: Map<string, string>,
+  _idsByName: Map<string, string>,
 ): Deck | undefined {
-  const name = normalizedDeckName(deck.name);
-  const id =
-    (name ? idsByName.get(name) : undefined) ??
-    (targets.has(deck.id) ? deck.id : undefined);
-  return id ? targets.get(id) : undefined;
+  return targets.get(deck.id);
+}
+
+function uniqueImportName(deck: Deck, targets: Map<string, Deck>) {
+  const base = normalizedDeckName(deck.name);
+  let name = base;
+  let suffix = 2;
+  while (
+    [...targets.values()].some(
+      (target) =>
+        target.id !== deck.id && normalizedDeckName(target.name) === name,
+    )
+  )
+    name = `${base || '名前のないデッキ'} (${suffix++})`;
+  return name;
 }
 
 export function createImportPreview(
@@ -122,14 +132,14 @@ export function createImportPreview(
   );
   return imported.map((deck, index) => {
     const existingDeck = findExistingDeck(deck, targets, idsByName);
-    const name = normalizedDeckName(deck.name);
+    const name = uniqueImportName(deck, targets);
     const targetId = existingDeck?.id ?? deck.id;
     const normalized = { ...deck, id: targetId, name };
     targets.set(targetId, normalized);
     if (name) idsByName.set(name, targetId);
     return {
       key: String(index) + ':' + deck.id,
-      deck,
+      deck: normalized,
       action: existingDeck ? 'update' : 'add',
       existingDeck,
     };
@@ -151,7 +161,7 @@ export function mergeImportedDecks(
   const updatedAt = new Date().toISOString();
   for (const importedDeck of imported) {
     const existingDeck = findExistingDeck(importedDeck, targets, idsByName);
-    const name = normalizedDeckName(importedDeck.name);
+    const name = uniqueImportName(importedDeck, targets);
     const targetId = existingDeck?.id ?? importedDeck.id;
     const merged: Deck = {
       ...importedDeck,

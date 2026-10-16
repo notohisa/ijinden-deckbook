@@ -36,6 +36,13 @@ import { useDeckBook } from '@/hooks/use-deck-book';
 import { useTheme } from '@/hooks/use-theme';
 import { parseDeckTextImport } from '@/lib/deck-text-import';
 import { applyCardRuleMetadata } from '@/lib/deck-utils';
+import {
+  DriveSyncPanel,
+  DeckTrash,
+  type AccountScope,
+} from '@/components/drive-sync-panel';
+import { forgetGoogleSession, type GoogleSession } from '@/lib/google-auth';
+import { localStorageKey } from '@/lib/deck-storage';
 
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'simulator' | 'help';
 type PendingImport = DeckImportParseResult & {
@@ -52,11 +59,74 @@ const cardsById = new Map(cards.map((card) => [card.id, card]));
 const cardIds = new Set(cardsById.keys());
 const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
 export default function Home() {
+  const [scope, setScope] = useState<AccountScope | null>(() => {
+    try {
+      const value = JSON.parse(
+        sessionStorage.getItem('ijinden-deckbook:account') ?? 'null',
+      ) as AccountScope | null;
+      return value &&
+        typeof value.sub === 'string' &&
+        /^\d{1,255}$/.test(value.sub) &&
+        typeof value.email === 'string'
+        ? value
+        : null;
+    } catch {
+      return null;
+    }
+  });
+  const [session, setSession] = useState<GoogleSession | null>(null);
+  function connect(next: GoogleSession) {
+    const account = { sub: next.sub, email: next.email };
+    try {
+      sessionStorage.setItem(
+        'ijinden-deckbook:account',
+        JSON.stringify(account),
+      );
+    } catch {
+      /* Token and current account still stay only in this tab. */
+    }
+    setSession(next);
+    setScope(account);
+  }
+  function disconnect() {
+    try {
+      sessionStorage.removeItem('ijinden-deckbook:account');
+    } catch {
+      /* In-memory logout still works. */
+    }
+    forgetGoogleSession();
+    setSession(null);
+    setScope(null);
+  }
+  return (
+    <DeckBookPage
+      key={scope?.sub ?? 'local'}
+      scope={scope}
+      session={session}
+      onSession={connect}
+      onDisconnect={disconnect}
+    />
+  );
+}
+
+function DeckBookPage({
+  scope,
+  session,
+  onSession,
+  onDisconnect,
+}: {
+  scope: AccountScope | null;
+  session: GoogleSession | null;
+  onSession: (session: GoogleSession) => void;
+  onDisconnect: () => void;
+}) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedDeckCardIds, setSelectedDeckCardIds] = useState<
     readonly string[] | null
   >(null);
-  const [activeTab, setActiveTab] = useState<AppTab>('cards');
+  const [activeTab, setActiveTab] = useState<AppTab>(
+    scope ? 'myDecks' : 'cards',
+  );
   const { preference: themePreference, setPreference: setThemePreference } =
     useTheme();
   const [notice, setNotice] = useState(
@@ -101,7 +171,10 @@ export default function Home() {
     [],
   );
 
-  const book = useDeckBook(showNotice);
+  const book = useDeckBook(
+    showNotice,
+    scope ? `${localStorageKey}:google:${scope.sub}` : localStorageKey,
+  );
   const {
     decks,
     activeDeck,
@@ -128,7 +201,7 @@ export default function Home() {
     book.openSavedDeck(deck);
     setActiveTab('recipe');
     showNotice(
-      'マイデッキを作業用レシピに読み込みました。変更は保存済みデッキへ反映されません。',
+      'マイデッキを読み込みました。「マイデッキに保存」で変更を反映できます。',
     );
   }
 
@@ -442,27 +515,41 @@ export default function Home() {
               />
             </div>
             {activeTab === 'recipe' && (
-              <DeckRecipe
-                deck={activeDeck}
-                cardsById={cardsById}
-                cardOrder={cardOrder}
-                notice={notice}
-                onSave={() => {
-                  void book.saveActiveDeck();
-                }}
-                onClear={() => {
-                  book.clearActiveDeck();
-                  showNotice('編集中のレシピとデッキ名をクリアしました。');
-                }}
-                onNameChange={(name) =>
-                  updateActiveDeck((deck) => ({ ...deck, name }))
-                }
-                onAdjustCard={adjustCard}
-                onMoveCard={moveCard}
-                onSelectCard={openDeckCard}
-                onOpenCards={() => setActiveTab('cards')}
-                onOpenSimulator={() => setActiveTab('simulator')}
-              />
+              <>
+                <DeckRecipe
+                  deck={activeDeck}
+                  cardsById={cardsById}
+                  cardOrder={cardOrder}
+                  notice={notice}
+                  onSave={() => {
+                    void book.saveActiveDeck();
+                  }}
+                  onClear={() => {
+                    book.clearActiveDeck();
+                    showNotice('編集中のレシピとデッキ名をクリアしました。');
+                  }}
+                  onNameChange={(name) =>
+                    updateActiveDeck((deck) => ({ ...deck, name }))
+                  }
+                  onAdjustCard={adjustCard}
+                  onMoveCard={moveCard}
+                  onSelectCard={openDeckCard}
+                  onOpenCards={() => setActiveTab('cards')}
+                  onOpenSimulator={() => setActiveTab('simulator')}
+                />
+                {activeDeck.sourceId && (
+                  <div className="mx-auto mb-4 max-w-2xl">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        void book.saveActiveDeck(true);
+                      }}
+                    >
+                      別のデッキとして保存
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
             <DeckSimulator
               active={activeTab === 'simulator'}
@@ -471,17 +558,32 @@ export default function Home() {
               cardsById={cardsById}
               onEditRecipe={openRecipeTab}
             />
-            {activeTab === 'myDecks' && (
-              <MyDecks
-                decks={decks}
+            <div hidden={activeTab !== 'myDecks'}>
+              <DriveSyncPanel
+                book={book}
+                scope={scope}
+                session={session}
+                knownCardIds={cardIds}
                 cardsById={cardsById}
-                onCreate={createDeck}
-                onOpenDeck={openSavedDeck}
-                onRename={renameSavedDeck}
-                onSetColor={setDeckColor}
-                onDelete={deleteSavedDeck}
+                onSession={onSession}
+                onDisconnect={onDisconnect}
+                notify={showNotice}
               />
-            )}
+              {activeTab === 'myDecks' && (
+                <>
+                  <MyDecks
+                    decks={decks}
+                    cardsById={cardsById}
+                    onCreate={createDeck}
+                    onOpenDeck={openSavedDeck}
+                    onRename={renameSavedDeck}
+                    onSetColor={setDeckColor}
+                    onDelete={deleteSavedDeck}
+                  />
+                  <DeckTrash book={book} />
+                </>
+              )}
+            </div>
             {activeTab === 'help' && (
               <Help onLegacyMigration={() => setLegacyMigrationOpen(true)} />
             )}
@@ -563,7 +665,8 @@ export default function Home() {
       <footer className="mx-auto max-w-[1480px] px-4 pb-8 pt-2 text-center text-[11px] tracking-wide text-[var(--muted)] sm:px-6">
         <span className="inline-flex items-center gap-1.5">
           ✦
-          非公式のデッキ作成補助アプリです。デッキデータはこの端末に保存します。
+          非公式のデッキ作成補助アプリです。デッキは端末に保存し、希望する場合は自分のGoogle
+          Driveと同期できます。
         </span>
         {/* oxlint-disable-next-line next/no-html-link-for-pages -- The policy is a static public HTML file outside Next routes and needs full-page navigation. */}
         <a

@@ -11,6 +11,74 @@ import {
 
 test.beforeEach(async ({ context }) => seed(context));
 
+test('a delayed save cannot attach its saved-deck ID to a different draft', async ({
+  page,
+  context,
+}) => {
+  await openRecipe(page);
+  const other = await context.newPage();
+  await other.goto('./');
+  await other.evaluate(
+    () =>
+      new Promise((ready) => {
+        void navigator.locks.request('ijinden-deckbook:archive', async () => {
+          await new Promise((release) => {
+            window.releaseArchiveLock = release;
+            ready();
+          });
+        });
+      }),
+  );
+  try {
+    await page
+      .getByRole('button', { name: 'マイデッキに保存', exact: true })
+      .click();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          async () => (await navigator.locks.query()).pending.length,
+        ),
+      )
+      .toBe(1);
+    await page.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
+    await page
+      .getByRole('button', { name: '新しいデッキ', exact: true })
+      .click();
+    await page
+      .getByRole('textbox', { name: 'デッキ名', exact: true })
+      .fill('次のデッキ');
+    await page.getByRole('tab', { name: 'カード', exact: true }).click();
+    await page
+      .getByRole('button', {
+        name: '織田信長（01-001）のメインに1枚追加する',
+        exact: true,
+      })
+      .click();
+  } finally {
+    await other.evaluate(() => window.releaseArchiveLock());
+  }
+  await expect
+    .poll(async () => (await stored(page)).draft.name)
+    .toBe('次のデッキ');
+  await expect.poll(async () => (await stored(page)).decks.length).toBe(2);
+  const firstSaved = (await stored(page)).decks.find(
+    (deck) => deck.name === draft.name,
+  );
+  expect(firstSaved).toBeDefined();
+  await page.getByRole('tab', { name: 'レシピ', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'マイデッキに保存', exact: true })
+    .click();
+  await expect.poll(async () => (await stored(page)).decks.length).toBe(3);
+  const result = await stored(page);
+  expect(result.decks.find((deck) => deck.id === firstSaved.id)).toEqual(
+    firstSaved,
+  );
+  expect(result.decks.find((deck) => deck.name === '次のデッキ').main).toEqual({
+    '01-001': 1,
+  });
+});
+
 test('import confirmation detects a saved-deck change while waiting for the write lock', async ({
   page,
   context,
@@ -51,11 +119,13 @@ test('import confirmation detects a saved-deck change while waiting for the writ
     .toBe(1);
   await other.evaluate(() => window.releaseArchiveLock());
   await expect(
-    preview.getByText(/この端末の既存デッキを更新します/),
+    preview.getByText('移行デッキ (2)', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole('alert', { includeHidden: true })).toContainText(
-    '別のタブでマイデッキが変更されました',
-  );
+  await expect(
+    page
+      .getByRole('alert', { includeHidden: true })
+      .filter({ hasText: '別のタブでマイデッキが変更されました' }),
+  ).toContainText('別のタブでマイデッキが変更されました');
   expect(
     (await stored(page)).decks.find((d) => d.id === 'other-import').main,
   ).toEqual(original.main);
@@ -64,7 +134,7 @@ test('import confirmation detects a saved-deck change while waiting for the writ
     .click();
   await expect(preview).toHaveCount(0);
   expect(
-    (await stored(page)).decks.find((d) => d.name === '移行デッキ').main,
+    (await stored(page)).decks.find((d) => d.name === '移行デッキ (2)').main,
   ).toEqual({ '02-005': 1 });
 });
 

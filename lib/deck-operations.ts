@@ -39,9 +39,26 @@ export function addSavedDeck(
     );
   }
   const base = normalizedDeckName(draft.name);
+  const target =
+    !allowRenaming && draft.sourceId
+      ? decks.find((deck) => deck.id === draft.sourceId)
+      : undefined;
+  if (!allowRenaming && draft.sourceId && !target)
+    throw new Error(
+      '元のデッキは削除されています。「別のデッキとして保存」を使ってください。',
+    );
+  if (target && draft.sourceUpdatedAt !== target.updatedAt)
+    throw new Error(
+      '元のデッキは別のタブまたは同期で変更されています。読み込み直すか、別のデッキとして保存してください。',
+    );
   let name = base;
   let suffix = 2;
-  while (decks.some((deck) => normalizedDeckName(deck.name) === name)) {
+  while (
+    decks.some(
+      (deck) =>
+        deck.id !== target?.id && normalizedDeckName(deck.name) === name,
+    )
+  ) {
     if (!allowRenaming)
       throw new Error(
         '同名のデッキはマイデッキに保存できません。デッキ名を変更してください。',
@@ -50,14 +67,19 @@ export function addSavedDeck(
   }
   const saved = {
     ...draft,
-    id: crypto.randomUUID(),
+    id: target?.id ?? crypto.randomUUID(),
     name,
     main: { ...draft.main },
     side: { ...draft.side },
     updatedAt: new Date().toISOString(),
     isSaved: true,
   };
-  return { decks: [saved, ...decks], value: name };
+  delete saved.sourceId;
+  delete saved.sourceUpdatedAt;
+  return {
+    decks: [saved, ...decks.filter((deck) => deck.id !== saved.id)],
+    value: name,
+  };
 }
 
 export function renameDeck(decks: Deck[], id: string, input: string) {
