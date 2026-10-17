@@ -276,7 +276,7 @@ export function DriveSyncPanel({
       }
       if (await book.applySyncSnapshot(syncKey(base), records))
         notify(
-          '端末のデッキを同期対象にコピーしました。「Google Driveと同期（保存・取得）」から「この内容でDriveと端末に保存」を行うとGoogle Driveに保存されます。',
+          'デッキを取り込みました。Driveに保存するには「Google Driveと同期（保存・取得）」を押してください。',
         );
     });
   }
@@ -355,7 +355,7 @@ export function DriveSyncPanel({
               disabled={busy || book.pendingWrites > 0}
               onClick={addLocalDecks}
             >
-              端末のデッキを同期対象に追加
+              Google接続前のデッキを取り込む
             </Button>
             <Button
               variant="ghost"
@@ -382,9 +382,9 @@ export function DriveSyncPanel({
           </p>
           <p id="add-local-decks-hint">
             <strong className="font-medium text-[var(--ink)]">
-              「端末のデッキを同期対象に追加」：
+              「Google接続前のデッキを取り込む」：
             </strong>{' '}
-            Googleに接続せずこのブラウザに保存していたデッキを、今選んだアカウント用の端末内一覧へコピーします。実際のDrive反映は次の手動同期で行われます。
+            Google接続前に保存したデッキをここにコピーします。元のデッキはそのまま残ります。Driveへの保存は、取り込み後に同期を行ってください。
           </p>
         </div>
       )}
