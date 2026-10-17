@@ -145,12 +145,15 @@ async function login(page) {
 }
 async function sync(page) {
   await page
-    .getByRole('button', { name: '同期内容を確認', exact: true })
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
     .click();
   const dialog = page.getByRole('dialog', { name: '同期内容の確認' });
   await expect(dialog).toBeVisible();
   await dialog
-    .getByRole('button', { name: 'この内容で同期', exact: true })
+    .getByRole('button', { name: 'この内容でDriveと端末に保存', exact: true })
     .click();
   await expect(dialog).toHaveCount(0);
 }
@@ -270,14 +273,19 @@ test('concurrent edits require a choice and preserve both versions', async ({
     await rename(other, original.name, 'PC版');
     await sync(page);
     await other
-      .getByRole('button', { name: '同期内容を確認', exact: true })
+      .getByRole('button', {
+        name: 'Google Driveと同期（保存・取得）',
+        exact: true,
+      })
       .click();
     const dialog = other.getByRole('dialog', { name: '同期内容の確認' });
     await expect(
-      dialog.getByRole('button', { name: 'この内容で同期' }),
+      dialog.getByRole('button', { name: 'この内容でDriveと端末に保存' }),
     ).toBeDisabled();
     await dialog.getByLabel('内容を別々のデッキとして残す').check();
-    await dialog.getByRole('button', { name: 'この内容で同期' }).click();
+    await dialog
+      .getByRole('button', { name: 'この内容でDriveと端末に保存' })
+      .click();
     await expect(dialog).toHaveCount(0);
     await sync(page);
     expect((await archive(page)).decks.map((d) => d.name).sort()).toEqual([
@@ -437,12 +445,15 @@ test('storage quota failure while saving keeps local decks and does not complete
   server.failReason = 'storageQuotaExceeded';
   server.failMethod = 'POST';
   await page
-    .getByRole('button', { name: '同期内容を確認', exact: true })
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
     .click();
   const dialog = page.getByRole('dialog', { name: '同期内容の確認' });
   await expect(dialog).toBeVisible();
   await dialog
-    .getByRole('button', { name: 'この内容で同期', exact: true })
+    .getByRole('button', { name: 'この内容でDriveと端末に保存', exact: true })
     .click();
 
   await expect(dialog.getByRole('alert')).toHaveText(
@@ -467,7 +478,10 @@ test('quota failures and newer cloud formats never erase local decks or report s
   const before = await archive(page);
   const writes = server.writes;
   await page
-    .getByRole('button', { name: '同期内容を確認', exact: true })
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
     .click();
   await expect(page.getByRole('alert')).toContainText(/制限|上限/);
   expect(await archive(page)).toEqual(before);
@@ -475,7 +489,10 @@ test('quota failures and newer cloud formats never erase local decks or report s
   server.fail = 0;
   [...server.files.values()][0].snapshot.version = 2;
   await page
-    .getByRole('button', { name: '同期内容を確認', exact: true })
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
     .click();
   await expect(page.getByRole('alert')).toContainText('新しい形式');
   expect(await archive(page)).toEqual(before);

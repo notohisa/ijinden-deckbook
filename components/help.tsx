@@ -145,11 +145,13 @@ export function Help({ onLegacyMigration }: { onLegacyMigration: () => void }) {
               元の端末で「Googleで接続」を押し、Googleアカウントに接続します（Google接続前のデッキを同期したい場合は、同期前に「端末のデッキを同期対象に追加」を押してコピーします）。
             </li>
             <li>
-              元の端末で「同期内容を確認」を押し、保存済みデッキの一覧を確認して「この内容で同期」を押してGoogle
+              元の端末で「Google
+              Driveと同期（保存・取得）」を押し、保存済みデッキの一覧を確認して「この内容でDriveと端末に保存」を押してGoogle
               Driveに保存します。
             </li>
             <li>
-              受け取り側の端末でも同じGoogleアカウントに接続し、「同期内容を確認」から「この内容で同期」を押して端末に反映します。
+              受け取り側の端末でも同じGoogleアカウントに接続し、「Google
+              Driveと同期（保存・取得）」から「この内容でDriveと端末に保存」を押して端末に反映します。
             </li>
           </ol>
           <p className="rounded-lg bg-[var(--soft)] px-3 py-2 text-sm leading-6">
