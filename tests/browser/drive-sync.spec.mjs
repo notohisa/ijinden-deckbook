@@ -160,7 +160,10 @@ async function sync(page) {
 async function importLocal(page) {
   page.once('dialog', (dialog) => dialog.accept());
   await page
-    .getByRole('button', { name: '端末のデッキを同期対象に追加', exact: true })
+    .getByRole('button', {
+      name: 'Google接続前のデッキを取り込む',
+      exact: true,
+    })
     .click();
   await expect(
     page.getByRole('button', { name: /^既存デッキ ✅/ }),

@@ -142,7 +142,7 @@ export function Help({ onLegacyMigration }: { onLegacyMigration: () => void }) {
           </p>
           <ol className="list-decimal space-y-2 pl-5 marker:font-medium marker:text-[var(--red)]">
             <li>
-              元の端末で「Googleで接続」を押し、Googleアカウントに接続します（Google接続前のデッキを同期したい場合は、同期前に「端末のデッキを同期対象に追加」を押してコピーします）。
+              元の端末で「Googleで接続」を押し、Googleアカウントに接続します（Google接続前のデッキを同期したい場合は、同期前に「Google接続前のデッキを取り込む」を押してコピーします）。
             </li>
             <li>
               元の端末で「Google
@@ -155,7 +155,7 @@ export function Help({ onLegacyMigration }: { onLegacyMigration: () => void }) {
             </li>
           </ol>
           <p className="rounded-lg bg-[var(--soft)] px-3 py-2 text-sm leading-6">
-            Google接続前にこのブラウザで保存していたデッキを同期したい場合は、接続後に「端末のデッキを同期対象に追加」を押してください。元のデッキは残ったままアカウント用の一覧へコピーされ、コピー後は別々に管理されます。実際のGoogle
+            Google接続前にこのブラウザで保存していたデッキを同期したい場合は、接続後に「Google接続前のデッキを取り込む」を押してください。元のデッキは残ったままアカウント用の一覧へコピーされ、コピー後は別々に管理されます。実際のGoogle
             Driveへの保存は、その後の手動同期で行われます（別端末で同期済みのデッキを受け取るだけならこの操作は不要です）。
           </p>
           <p>
