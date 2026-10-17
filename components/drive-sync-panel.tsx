@@ -249,12 +249,12 @@ export function DriveSyncPanel({
         localStorage.getItem(localStorageKey),
       );
       if (local.status !== 'ready')
-        throw new Error('この端末だけのデッキを読み込めませんでした。');
+        throw new Error('Google接続前に保存したデッキを読み込めませんでした。');
       if (!local.decks.length)
-        throw new Error('この端末だけの保存済みデッキはありません。');
+        throw new Error('Google接続前に保存したデッキはありません。');
       if (
         !window.confirm(
-          `この端末だけのデッキ ${local.decks.length}件を ${scope?.email} の保存領域にコピーします。Driveには次の同期で保存します。よろしいですか？`,
+          `Google接続前に保存したデッキ ${local.decks.length}件を、元のデッキを残して ${scope?.email} の端末内一覧へコピーします。この操作ではGoogle Driveに保存されず、次の同期で保存されます。よろしいですか？`,
         )
       )
         return;
@@ -276,7 +276,7 @@ export function DriveSyncPanel({
       }
       if (await book.applySyncSnapshot(syncKey(base), records))
         notify(
-          'この端末のデッキを追加しました。「同期内容を確認」からDriveに保存できます。',
+          '端末のデッキを同期対象にコピーしました。「同期内容を確認」から「この内容で同期」を行うとGoogle Driveに保存されます。',
         );
     });
   }
@@ -310,7 +310,7 @@ export function DriveSyncPanel({
       </p>
       <p className="mt-1 text-[var(--muted)]">
         自分のGoogle
-        Driveで、保存済みマイデッキすべてとゴミ箱を同期します。作業中のレシピは端末ごとに保存します。
+        Driveで、保存済みマイデッキ全件とゴミ箱を同期します。作業中の未保存レシピは同期されず、端末内のみに保持されます。
       </p>
       <p className="mt-2 text-xs text-[var(--muted)]">
         同期は任意・手動です。ページの再読み込み後や認証の有効期限が切れた場合は、Googleへの再接続が必要です。
@@ -349,10 +349,12 @@ export function DriveSyncPanel({
             </Button>
             <Button
               variant="outline"
+              className="h-auto min-h-8 max-w-full whitespace-normal text-left"
+              aria-describedby="add-local-decks-hint"
               disabled={busy || book.pendingWrites > 0}
               onClick={addLocalDecks}
             >
-              この端末だけのデッキを追加
+              端末のデッキを同期対象に追加
             </Button>
             <Button
               variant="ghost"
@@ -361,18 +363,36 @@ export function DriveSyncPanel({
             >
               ログアウト
             </Button>
-            <Button variant="ghost" disabled={busy} onClick={exportBackup}>
-              同期前バックアップ
+            <Button
+              variant="ghost"
+              className="h-auto min-h-8 max-w-full whitespace-normal text-left"
+              disabled={busy}
+              onClick={exportBackup}
+            >
+              同期前バックアップをダウンロード
             </Button>
           </>
         )}
       </div>
       {scope && (
+        <div className="mt-2 space-y-1 text-xs text-[var(--muted)]">
+          <p>
+            別端末で同期したデッキを受け取るには、「同期内容を確認」から「この内容で同期」まで進めてください。
+          </p>
+          <p id="add-local-decks-hint">
+            <strong className="font-medium text-[var(--ink)]">
+              「端末のデッキを同期対象に追加」：
+            </strong>{' '}
+            Googleに接続せずこのブラウザに保存していたデッキを、今選んだアカウント用の端末内一覧へコピーします。実際のDrive反映は次の手動同期で行われます。
+          </p>
+        </div>
+      )}
+      {scope && (
         <p className="mt-2 text-xs text-[var(--muted)]">
           {lastSyncedAt
             ? `最後の同期：${new Date(lastSyncedAt).toLocaleString('ja-JP')}`
             : 'まだ同期していません。'}{' '}
-          変更は「同期内容を確認」後に反映されます。
+          変更は「同期内容を確認」から「この内容で同期」を実行すると反映されます。
         </p>
       )}
       {scope && !session && (
@@ -418,7 +438,8 @@ export function DriveSyncPanel({
           <DialogHeader>
             <DialogTitle>同期内容の確認</DialogTitle>
             <DialogDescription>
-              端末とDriveの変更を合わせます。確認後に保存します。競合がある場合は、残す内容を選んでください。
+              端末とGoogle
+              Driveの内容を合わせます。「この内容で同期」を押すと反映されます。競合がある場合は、残す内容を選んでください。
             </DialogDescription>
           </DialogHeader>
           {plan && (
@@ -590,7 +611,7 @@ export function DeckTrash({ book }: { book: Book }) {
           ゴミ箱（{book.trash.length}件）
         </summary>
         <p className="my-3 text-xs text-[var(--muted)]">
-          削除をDriveに同期してから30日後、次の同期で完全削除します。同期していないデッキは自動削除しません。
+          削除を初めて同期してから30日経過後の次回同期で完全削除されます。削除を同期していないデッキは自動削除されません。
         </p>
         {book.trash.map((record) => (
           <div

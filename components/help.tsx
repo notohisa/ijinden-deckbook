@@ -81,7 +81,7 @@ export function Help({ onLegacyMigration }: { onLegacyMigration: () => void }) {
           <ol className="list-decimal space-y-2 pl-5 marker:font-medium marker:text-[var(--red)]">
             <li>「マイデッキ」タブでデッキを選び、レシピに読み込みます。</li>
             <li>
-              カードを調整し、別の名前を付けて「マイデッキに保存」を押します。
+              カードを調整し、「マイデッキに保存」を押して上書き更新します（別のデッキとして複製する場合は「別のデッキとして保存」）。
             </li>
           </ol>
           <p>
@@ -135,10 +135,39 @@ export function Help({ onLegacyMigration }: { onLegacyMigration: () => void }) {
 
         <section className="space-y-3 border-t border-[var(--line)] pt-6">
           <h2 className="font-display text-lg tracking-wide text-[var(--ink)]">
+            Google Driveで自分の端末間を同期する
+          </h2>
+          <p>
+            PCやスマートフォンなど複数の端末間で、保存済みマイデッキとゴミ箱を手動で同期できます。
+          </p>
+          <ol className="list-decimal space-y-2 pl-5 marker:font-medium marker:text-[var(--red)]">
+            <li>
+              元の端末で「Googleで接続」を押し、Googleアカウントに接続します（Google接続前のデッキを同期したい場合は、同期前に「端末のデッキを同期対象に追加」を押してコピーします）。
+            </li>
+            <li>
+              元の端末で「同期内容を確認」を押し、保存済みデッキの一覧を確認して「この内容で同期」を押してGoogle
+              Driveに保存します。
+            </li>
+            <li>
+              受け取り側の端末でも同じGoogleアカウントに接続し、「同期内容を確認」から「この内容で同期」を押して端末に反映します。
+            </li>
+          </ol>
+          <p className="rounded-lg bg-[var(--soft)] px-3 py-2 text-sm leading-6">
+            Google接続前にこのブラウザで保存していたデッキを同期したい場合は、接続後に「端末のデッキを同期対象に追加」を押してください。元のデッキは残ったままアカウント用の一覧へコピーされ、コピー後は別々に管理されます。実際のGoogle
+            Driveへの保存は、その後の手動同期で行われます（別端末で同期済みのデッキを受け取るだけならこの操作は不要です）。
+          </p>
+          <p>
+            同期は自動ではなく手動です。また、作成中でマイデッキに未保存のレシピは同期されず、端末内のみに保持されます。
+          </p>
+        </section>
+
+        <section className="space-y-3 border-t border-[var(--line)] pt-6">
+          <h2 className="font-display text-lg tracking-wide text-[var(--ink)]">
             バックアップ・別の端末への移動
           </h2>
           <p>
-            データは端末のブラウザ内に保存され、別の端末やブラウザには自動で引き継がれません。サイトデータを削除すると消えるため、定期的にバックアップしてください。
+            データは端末のブラウザ内に保存され、ブラウザのサイトデータを消すと端末内のデータが消えます。別の端末と共有したい場合は「Google
+            Drive同期」を利用するか、定期的にファイルへバックアップしてください。
           </p>
           <h3 className="font-medium text-[var(--ink)]">ファイルに保存する</h3>
           <ol className="list-decimal space-y-2 pl-5 marker:font-medium marker:text-[var(--red)]">
