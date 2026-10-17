@@ -276,7 +276,7 @@ export function DriveSyncPanel({
       }
       if (await book.applySyncSnapshot(syncKey(base), records))
         notify(
-          '端末のデッキを同期対象にコピーしました。「同期内容を確認」から「この内容で同期」を行うとGoogle Driveに保存されます。',
+          '端末のデッキを同期対象にコピーしました。「Google Driveと同期（保存・取得）」から「この内容でDriveと端末に保存」を行うとGoogle Driveに保存されます。',
         );
     });
   }
@@ -342,10 +342,11 @@ export function DriveSyncPanel({
           <>
             <Button
               variant="outline"
+              className="h-auto min-h-8 max-w-full whitespace-normal text-left"
               disabled={busy || !session || book.pendingWrites > 0}
               onClick={preview}
             >
-              同期内容を確認
+              Google Driveと同期（保存・取得）
             </Button>
             <Button
               variant="outline"
@@ -377,7 +378,7 @@ export function DriveSyncPanel({
       {scope && (
         <div className="mt-2 space-y-1 text-xs text-[var(--muted)]">
           <p>
-            別端末で同期したデッキを受け取るには、「同期内容を確認」から「この内容で同期」まで進めてください。
+            Google Drive側にある新しいデッキや変更も、この端末に取り込まれます。
           </p>
           <p id="add-local-decks-hint">
             <strong className="font-medium text-[var(--ink)]">
@@ -392,7 +393,8 @@ export function DriveSyncPanel({
           {lastSyncedAt
             ? `最後の同期：${new Date(lastSyncedAt).toLocaleString('ja-JP')}`
             : 'まだ同期していません。'}{' '}
-          変更は「同期内容を確認」から「この内容で同期」を実行すると反映されます。
+          変更は「Google
+          Driveと同期（保存・取得）」から「この内容でDriveと端末に保存」を実行すると反映されます。
         </p>
       )}
       {scope && !session && (
@@ -439,7 +441,7 @@ export function DriveSyncPanel({
             <DialogTitle>同期内容の確認</DialogTitle>
             <DialogDescription>
               端末とGoogle
-              Driveの内容を合わせます。「この内容で同期」を押すと反映されます。競合がある場合は、残す内容を選んでください。
+              Driveの内容を合わせます。「この内容でDriveと端末に保存」を押すと反映されます。競合がある場合は、残す内容を選んでください。
             </DialogDescription>
           </DialogHeader>
           {plan && (
@@ -559,6 +561,7 @@ export function DriveSyncPanel({
               あとで
             </Button>
             <Button
+              className="h-auto min-h-8 max-w-full whitespace-normal"
               disabled={
                 busy ||
                 !plan ||
@@ -566,7 +569,7 @@ export function DriveSyncPanel({
               }
               onClick={commit}
             >
-              この内容で同期
+              この内容でDriveと端末に保存
             </Button>
           </DialogFooter>
         </DialogContent>
