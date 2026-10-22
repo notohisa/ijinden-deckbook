@@ -26,12 +26,12 @@ export const customCards: CustomIjindenCard[] = [
     release: 'ファンアートコレクション',
     cardType: 'イジン',
     rarity: 'SR',
-    color: '赤',
+    color: '青',
     level: 1,
     power: 1000,
     trait: '',
     description:
-      '戦場に他の赤のイジンがいる間「即応」を得る。\n（戦場に置かれたターンでもアタッカーになれる）\n\n遺業能力：（戦場から墓地に置かれたときに発動できる）\n1ドローする。',
+      '戦場に他の青のイジンがいる間「即応」を得る。\n（戦場に置かれたターンでもアタッカーになれる）\n\n遺業能力：（戦場から墓地に置かれたときに発動できる）\n1ドローする。',
     imageUrl: 'cards/martha-jane-canary-summer-sr.png',
   },
   {
@@ -48,5 +48,20 @@ export const customCards: CustomIjindenCard[] = [
     description:
       '戦場に他の紫のイジンがいる間「即応」を得る。\n（戦場に置かれたターンでもアタッカーになれる）\n\n遺業能力：（戦場から墓地に置かれたときに発動できる）\n1ドローする。',
     imageUrl: 'cards/martha-jane-canary-halloween-sr.png',
+  },
+  {
+    id: 'FA-SR-01-004',
+    number: '004',
+    name: 'マーサ・ジェーン・カナリー（クリスマス）',
+    release: 'ファンアートコレクション',
+    cardType: 'イジン',
+    rarity: 'SR',
+    color: '黄',
+    level: 1,
+    power: 1000,
+    trait: '',
+    description:
+      '戦場に他の黄のイジンがいる間「即応」を得る。\n（戦場に置かれたターンでもアタッカーになれる）\n\n遺業能力：（戦場から墓地に置かれたときに発動できる）\n1ドローする。',
+    imageUrl: 'cards/martha-jane-canary-christmas-sr.png',
   },
 ];
