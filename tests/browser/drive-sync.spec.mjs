@@ -7,11 +7,13 @@ test.skip(
 );
 test.setTimeout(180_000);
 const accountKey = `${key}:google:111`;
+const rememberedAccountKey = 'ijinden-deckbook:remembered-google-account:v1';
 
 function cloud() {
   return {
     files: new Map(),
     writes: 0,
+    reads: 0,
     nextId: 1,
     fail: 0,
     failReason: 'rateLimitExceeded',
@@ -30,6 +32,8 @@ async function setup(
       window.mockGoogleSub = sub;
       window.mockGoogleRequestedScopes = '';
       window.mockGoogleValidatedScopes = [];
+      window.mockGoogleAuthRequests = [];
+      window.mockGoogleExpiresIn = 3600;
       window.mockGooglePopupClosed = false;
       window.installMockGoogle = () => {
         window.google = {
@@ -42,7 +46,8 @@ async function setup(
               initTokenClient: (config) => {
                 window.mockGoogleRequestedScopes = config.scope;
                 return {
-                  requestAccessToken: () => {
+                  requestAccessToken: (options) => {
+                    window.mockGoogleAuthRequests.push(options ?? {});
                     if (window.mockGooglePopupClosed) {
                       window.mockGooglePopupClosed = false;
                       config.error_callback({ type: 'popup_closed' });
@@ -50,7 +55,7 @@ async function setup(
                     }
                     config.callback({
                       access_token: `test-${window.mockGoogleSub}`,
-                      expires_in: 3600,
+                      expires_in: window.mockGoogleExpiresIn,
                     });
                   },
                 };
@@ -83,6 +88,7 @@ async function setup(
         { error: { errors: [{ reason: server.failReason }] } },
         server.fail,
       );
+    if (request.method() === 'GET') server.reads++;
     if (request.method() === 'GET' && url.pathname === '/drive/v3/files')
       return respond({
         files: [...server.files]
@@ -126,7 +132,12 @@ async function setup(
 async function login(page) {
   await page.goto('./');
   await page.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
-  await page.getByRole('button', { name: 'Googleで接続', exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
+    .click();
   await expect(
     page.getByText('保存先：111@example.com', { exact: true }),
   ).toBeVisible();
@@ -142,8 +153,180 @@ async function login(page) {
     'email',
     'https://www.googleapis.com/auth/drive.appdata',
   ]);
+  expect(await page.evaluate(() => window.mockGoogleAuthRequests)).toEqual([
+    { prompt: 'select_account' },
+  ]);
+  const initialPreview = page.getByRole('dialog', { name: '同期内容の確認' });
+  await expect(initialPreview).toBeVisible();
+  await initialPreview
+    .getByRole('button', { name: 'あとで', exact: true })
+    .click();
+  await expect(initialPreview).toHaveCount(0);
 }
-async function sync(page) {
+
+test('remembers the account across reload without restoring a token or opening Drive', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  await setup(context, server);
+  await login(page);
+  await importLocal(page);
+  await sync(page);
+  const readsBeforeReload = server.reads;
+  const remembered = await page.evaluate(
+    (accountKey) => JSON.parse(localStorage.getItem(accountKey)),
+    rememberedAccountKey,
+  );
+  expect(remembered).toEqual({ sub: '111', email: '111@example.com' });
+
+  await page.reload();
+  await expect(
+    page.getByText('保存先：111@example.com', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /^既存デッキ ✅/ }),
+  ).toBeVisible();
+  expect(server.reads).toBe(readsBeforeReload);
+  expect(await page.evaluate(() => window.mockGoogleAuthRequests)).toEqual([]);
+  const storedValues = await page.evaluate(() =>
+    JSON.stringify([
+      Object.keys(localStorage).map((storageKey) =>
+        localStorage.getItem(storageKey),
+      ),
+      Object.keys(sessionStorage).map((storageKey) =>
+        sessionStorage.getItem(storageKey),
+      ),
+    ]),
+  );
+  expect(storedValues).not.toContain('test-111');
+
+  await page
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole('dialog', { name: '同期内容の確認' }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => window.mockGoogleAuthRequests)).toEqual([
+    { prompt: '', login_hint: '111' },
+  ]);
+});
+
+test('migrates the old tab account and logout prevents it reappearing in another tab', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  await setup(context, server);
+  await context.addInitScript(() => {
+    sessionStorage.setItem(
+      'ijinden-deckbook:account',
+      JSON.stringify({ sub: '111', email: '111@example.com' }),
+    );
+  });
+  await page.goto('./');
+  await page.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
+  await expect(
+    page.getByText('保存先：111@example.com', { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      (accountKey) => localStorage.getItem(accountKey),
+      rememberedAccountKey,
+    ),
+  ).toBe(JSON.stringify({ sub: '111', email: '111@example.com' }));
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem('ijinden-deckbook:account'),
+    ),
+  ).toBeNull();
+
+  const other = await context.newPage();
+  await other.goto('./');
+  await other.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
+  await expect(
+    other.getByText('保存先：111@example.com', { exact: true }),
+  ).toBeVisible();
+  await other.evaluate(() => {
+    sessionStorage.setItem(
+      'ijinden-deckbook:account',
+      JSON.stringify({ sub: '111', email: '111@example.com' }),
+    );
+  });
+
+  await page.getByRole('button', { name: 'ログアウト', exact: true }).click();
+  await page.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
+  await expect(
+    page.getByText('保存先：この端末のみ', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    other.getByText('保存先：111@example.com', { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      (accountKey) => JSON.parse(localStorage.getItem(accountKey)),
+      rememberedAccountKey,
+    ),
+  ).toEqual({ cleared: true });
+
+  await other.reload();
+  await other.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
+  await expect(
+    other.getByText('保存先：この端末のみ', { exact: true }),
+  ).toBeVisible();
+  expect(
+    await other.evaluate(() =>
+      sessionStorage.getItem('ijinden-deckbook:account'),
+    ),
+  ).toBeNull();
+  await other.close();
+});
+
+test('a different authenticated sub cannot read or write the remembered account Drive', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  await setup(context, server);
+  await login(page);
+  await page.reload();
+  const readsBefore = server.reads;
+  const writesBefore = server.writes;
+  await page.evaluate(() => {
+    window.mockGoogleSub = '222';
+  });
+  await page
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
+    .click();
+  await expect(page.getByRole('alert')).toContainText('ログアウトしてから');
+  expect(server.reads).toBe(readsBefore);
+  expect(server.writes).toBe(writesBefore);
+  expect(
+    await page.evaluate(
+      (accountKey) => JSON.parse(localStorage.getItem(accountKey)),
+      rememberedAccountKey,
+    ),
+  ).toEqual({ sub: '111', email: '111@example.com' });
+  await expect(
+    page.getByText('保存先：111@example.com', { exact: true }),
+  ).toBeVisible();
+});
+
+test('an expired confirmation click reauthenticates and requires a second save click', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  await setup(context, server);
+  await page.clock.install();
+  await login(page);
+  await importLocal(page);
   await page
     .getByRole('button', {
       name: 'Google Driveと同期（保存・取得）',
@@ -151,6 +334,80 @@ async function sync(page) {
     })
     .click();
   const dialog = page.getByRole('dialog', { name: '同期内容の確認' });
+  await expect(dialog).toBeVisible();
+  const writesBefore = server.writes;
+  await page.clock.fastForward(3_600_001);
+  await dialog
+    .getByRole('button', { name: 'この内容でDriveと端末に保存', exact: true })
+    .click();
+  await expect(dialog).toBeVisible();
+  expect(server.writes).toBe(writesBefore);
+  expect(await page.evaluate(() => window.mockGoogleAuthRequests)).toEqual([
+    { prompt: 'select_account' },
+    { prompt: '', login_hint: '111' },
+  ]);
+  await dialog
+    .getByRole('button', { name: 'この内容でDriveと端末に保存', exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  expect(server.writes).toBeGreaterThan(writesBefore);
+});
+
+test('a Drive 401 does not open a popup automatically; the next click reauthenticates', async ({
+  page,
+  context,
+}) => {
+  const server = cloud();
+  await setup(context, server);
+  await login(page);
+  await importLocal(page);
+  await page
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
+    .click();
+  const dialog = page.getByRole('dialog', { name: '同期内容の確認' });
+  await expect(dialog).toBeVisible();
+  const writesBefore = server.writes;
+  server.fail = 401;
+  server.failMethod = 'GET';
+  await dialog
+    .getByRole('button', { name: 'この内容でDriveと端末に保存', exact: true })
+    .click();
+  await expect(dialog.getByRole('alert')).toContainText('有効期限');
+  expect(server.writes).toBe(writesBefore);
+  expect(await page.evaluate(() => window.mockGoogleAuthRequests)).toHaveLength(
+    1,
+  );
+
+  server.fail = 0;
+  await dialog
+    .getByRole('button', { name: 'この内容でDriveと端末に保存', exact: true })
+    .click();
+  await expect(dialog).toBeVisible();
+  expect(server.writes).toBe(writesBefore);
+  expect(await page.evaluate(() => window.mockGoogleAuthRequests)).toEqual([
+    { prompt: 'select_account' },
+    { prompt: '', login_hint: '111' },
+  ]);
+  await dialog
+    .getByRole('button', { name: 'この内容でDriveと端末に保存', exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  expect(server.writes).toBeGreaterThan(writesBefore);
+});
+
+async function sync(page) {
+  const dialog = page.getByRole('dialog', { name: '同期内容の確認' });
+  if ((await dialog.count()) === 0) {
+    await page
+      .getByRole('button', {
+        name: 'Google Driveと同期（保存・取得）',
+        exact: true,
+      })
+      .click();
+  }
   await expect(dialog).toBeVisible();
   await dialog
     .getByRole('button', { name: 'この内容でDriveと端末に保存', exact: true })
@@ -229,10 +486,16 @@ test('two isolated devices sync, trash, restore, and keep other Google accounts 
       window.mockGoogleSub = '222';
     });
     await page
-      .getByRole('button', { name: 'Googleで接続', exact: true })
+      .getByRole('button', {
+        name: 'Google Driveと同期（保存・取得）',
+        exact: true,
+      })
       .click();
     await expect(
       page.getByText('保存先：222@example.com', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('dialog', { name: '同期内容の確認' }),
     ).toBeVisible();
     await sync(page);
     const otherAccount = await page.evaluate(
@@ -319,7 +582,12 @@ test('popup_closed leaves the account disconnected and allows retry', async ({
   await page.evaluate(() => {
     window.mockGooglePopupClosed = true;
   });
-  await page.getByRole('button', { name: 'Googleで接続', exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
+    .click();
   await expect(page.getByRole('alert')).toHaveText(
     'Google認証がキャンセルされました。',
   );
@@ -327,10 +595,18 @@ test('popup_closed leaves the account disconnected and allows retry', async ({
     page.getByText('保存先：この端末のみ', { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Googleで接続', exact: true }),
+    page.getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    }),
   ).toBeEnabled();
 
-  await page.getByRole('button', { name: 'Googleで接続', exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Google Driveと同期（保存・取得）',
+      exact: true,
+    })
+    .click();
   await expect(
     page.getByText('保存先：111@example.com', { exact: true }),
   ).toBeVisible();
@@ -358,19 +634,19 @@ test('failed Google auth script load can be retried after network recovery', asy
 
   await page.goto('./');
   await page.getByRole('tab', { name: 'マイデッキ', exact: true }).click();
-  const connect = page.getByRole('button', {
-    name: 'Googleで接続',
+  const sync = page.getByRole('button', {
+    name: 'Google Driveと同期（保存・取得）',
     exact: true,
   });
   await expect(
     page.getByText('Google認証の準備に失敗しました。'),
   ).toBeVisible();
-  await expect(connect).toBeDisabled();
+  await expect(sync).toBeDisabled();
   await page.getByRole('button', { name: '再試行', exact: true }).click();
-  await expect(connect).toBeEnabled();
+  await expect(sync).toBeEnabled();
   expect(attempts).toBe(2);
 
-  await connect.click();
+  await sync.click();
   await expect(
     page.getByText('保存先：111@example.com', { exact: true }),
   ).toBeVisible();
@@ -425,7 +701,10 @@ test('Google auth script timeout allows a new load attempt', async ({
     await expect.poll(() => hangingRequestEnded).toBe(true);
     await page.getByRole('button', { name: '再試行', exact: true }).click();
     await expect(
-      page.getByRole('button', { name: 'Googleで接続', exact: true }),
+      page.getByRole('button', {
+        name: 'Google Driveと同期（保存・取得）',
+        exact: true,
+      }),
     ).toBeEnabled();
     expect(attempts).toBe(2);
   } finally {

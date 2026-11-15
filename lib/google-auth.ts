@@ -13,7 +13,10 @@ type GoogleTokenResponse = {
 };
 
 type GoogleTokenClient = {
-  requestAccessToken: (override?: { prompt?: string }) => void;
+  requestAccessToken: (override?: {
+    prompt?: string;
+    login_hint?: string;
+  }) => void;
 };
 
 type GoogleIdentityApi = {
@@ -218,7 +221,10 @@ async function loadUserProfile(
  * Start this function directly from a user click after loadGoogleAuth has
  * completed. GIS opens its popup synchronously from requestAccessToken.
  */
-export function requestGoogleSession(): Promise<GoogleSession> {
+export function requestGoogleSession(options?: {
+  prompt?: string;
+  login_hint?: string;
+}): Promise<GoogleSession> {
   const oauth = googleApi()?.accounts?.oauth2;
   if (!GOOGLE_CLIENT_ID) {
     return Promise.reject(
@@ -318,7 +324,7 @@ export function requestGoogleSession(): Promise<GoogleSession> {
         error_callback: (error) => finish(authErrorForPopup(error?.type)),
       });
       // Keep this call synchronous with the user's click so the browser allows the popup.
-      client.requestAccessToken({ prompt: 'select_account' });
+      client.requestAccessToken(options ?? { prompt: 'select_account' });
     } catch (error) {
       finish(authError('Google認証画面を開けませんでした。', error));
     }

@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import type { useDeckBook } from '@/hooks/use-deck-book';
 import { syncKey, type ReadyArchive } from '@/lib/deck-archive-repository';
 import { loadStoredArchive, localStorageKey } from '@/lib/deck-storage';
@@ -13,9 +19,13 @@ import {
   type SyncConflict,
   type SyncRecord,
 } from '@/lib/deck-sync';
-import { createDriveClient } from '@/lib/google-drive-sync';
+import {
+  createDriveClient,
+  GoogleDriveSyncError,
+} from '@/lib/google-drive-sync';
 import {
   GOOGLE_CLIENT_ID,
+  forgetGoogleSession,
   loadGoogleAuth,
   requestGoogleSession,
   type GoogleSession,
@@ -42,9 +52,12 @@ type Props = {
   book: Book;
   scope: AccountScope | null;
   session: GoogleSession | null;
+  autoSync: boolean;
   knownCardIds: ReadonlySet<string>;
   cardsById: ReadonlyMap<string, { name: string }>;
-  onSession: (session: GoogleSession) => void;
+  onSession: (session: GoogleSession, autoSync?: boolean) => void;
+  onSessionInvalid: () => void;
+  onAutoSyncConsumed: (sub: string) => void;
   onDisconnect: () => void;
   notify: (message: string) => void;
 };
@@ -55,9 +68,12 @@ export function DriveSyncPanel({
   book,
   scope,
   session,
+  autoSync,
   knownCardIds,
   cardsById,
   onSession,
+  onSessionInvalid,
+  onAutoSyncConsumed,
   onDisconnect,
   notify,
 }: Props) {
@@ -70,6 +86,7 @@ export function DriveSyncPanel({
   const [choices, setChoices] = useState<Record<string, number | 'both'>>({});
   const alive = useRef(true);
   const running = useRef(false);
+  const autoSyncHandled = useRef<string | null>(null);
   const prepareAuth = useCallback(() => {
     if (!GOOGLE_CLIENT_ID) return;
     setAuthLoadState('preparing');
@@ -94,22 +111,33 @@ export function DriveSyncPanel({
   }, [prepareAuth]);
   /* oxlint-enable react/react-compiler */
 
-  function assertSession(): GoogleSession {
+  function sessionIsUsable(
+    candidate: GoogleSession | null,
+  ): candidate is GoogleSession {
+    return Boolean(
+      candidate &&
+      scope &&
+      candidate.sub === scope.sub &&
+      candidate.expiresAt > Date.now() + 5000,
+    );
+  }
+
+  function assertSession(candidate: GoogleSession): GoogleSession {
     if (!alive.current)
       throw new Error('接続先が変わりました。もう一度同期してください。');
     if (
-      !session ||
-      session.sub !== scope?.sub ||
-      session.expiresAt <= Date.now() + 5000
+      !scope ||
+      candidate.sub !== scope.sub ||
+      candidate.expiresAt <= Date.now() + 5000
     )
       throw new Error(
-        'Googleへの再接続が必要です。「Googleに接続」を押してください。',
+        'Googleへの再接続が必要です。「Google Driveと同期（保存・取得）」を押してください。',
       );
     if (!navigator.onLine)
       throw new Error(
         'オフラインです。端末には保存されています。通信が戻ってから同期してください。',
       );
-    return session;
+    return candidate;
   }
 
   async function perform(operation: () => Promise<void>) {
@@ -120,6 +148,14 @@ export function DriveSyncPanel({
     try {
       await operation();
     } catch (cause) {
+      if (
+        alive.current &&
+        cause instanceof GoogleDriveSyncError &&
+        cause.status === 401
+      ) {
+        forgetGoogleSession();
+        onSessionInvalid();
+      }
       if (alive.current) setError(message(cause));
     } finally {
       running.current = false;
@@ -127,51 +163,115 @@ export function DriveSyncPanel({
     }
   }
 
-  function connect() {
-    // This call stays in the click handler so browsers can open the Google popup.
+  function authOptions() {
+    return scope
+      ? { prompt: '', login_hint: scope.sub }
+      : { prompt: 'select_account' };
+  }
+
+  function acceptSession(next: GoogleSession): boolean {
+    if (!alive.current) {
+      forgetGoogleSession();
+      return false;
+    }
+    if (scope && next.sub !== scope.sub) {
+      forgetGoogleSession();
+      throw new Error(
+        '認証したGoogleアカウントが保存先と異なります。切り替えるにはログアウトしてから、もう一度お試しください。',
+      );
+    }
+    onSession(next, scope === null);
+    return true;
+  }
+
+  async function previewWith(candidate: GoogleSession) {
+    const auth = assertSession(candidate);
+    const base = await book.getSyncSnapshot();
+    if (!base?.sync) throw new Error('端末の保存を確認できませんでした。');
+    validateSnapshot(
+      {
+        format: 'ijinden-deckbook-sync',
+        version: 1,
+        writerId: base.sync.writerId,
+        records: base.sync.records,
+      },
+      knownCardIds,
+    );
+    const remote = await createDriveClient(auth.accessToken).readAll(
+      knownCardIds,
+    );
+    assertSession(auth);
+    const merged = mergeRecords(
+      base.sync.records,
+      remote.snapshots.map((s) => s.records),
+    );
+    // Keep the Drive candidate under the original ID when choosing both.
+    for (const conflict of merged.conflicts)
+      conflict.candidates.sort(
+        (a, b) =>
+          Number(isLocalCandidate(base, a)) - Number(isLocalCandidate(base, b)),
+      );
+    setChoices({});
+    setPlan({ base, remoteKey: JSON.stringify(remote.snapshots), ...merged });
+  }
+
+  function startSync() {
+    if (running.current) return;
+    if (sessionIsUsable(session)) {
+      void perform(() => previewWith(session));
+      return;
+    }
+    // Keep the GIS call in this click handler; no loading or storage await may precede it.
     void perform(async () => {
-      const next = await requestGoogleSession();
-      if (alive.current) onSession(next);
+      const authRequest = requestGoogleSession(authOptions());
+      const next = await authRequest;
+      if (!acceptSession(next)) return;
+      if (scope) await previewWith(next);
     });
   }
 
-  function preview() {
-    void perform(async () => {
-      const auth = assertSession();
-      const base = await book.getSyncSnapshot();
-      if (!base?.sync) throw new Error('端末の保存を確認できませんでした。');
-      validateSnapshot(
-        {
-          format: 'ijinden-deckbook-sync',
-          version: 1,
-          writerId: base.sync.writerId,
-          records: base.sync.records,
-        },
-        knownCardIds,
-      );
-      const remote = await createDriveClient(auth.accessToken).readAll(
-        knownCardIds,
-      );
-      assertSession();
-      const merged = mergeRecords(
-        base.sync.records,
-        remote.snapshots.map((s) => s.records),
-      );
-      // Keep the Drive candidate under the original ID when choosing both.
-      for (const conflict of merged.conflicts)
-        conflict.candidates.sort(
-          (a, b) =>
-            Number(isLocalCandidate(base, a)) -
-            Number(isLocalCandidate(base, b)),
-        );
-      setChoices({});
-      setPlan({ base, remoteKey: JSON.stringify(remote.snapshots), ...merged });
-    });
-  }
+  const launchPreview = useEffectEvent((candidate: GoogleSession) => {
+    void perform(() => previewWith(candidate));
+  });
+  useEffect(() => {
+    if (
+      !autoSync ||
+      !scope ||
+      !session ||
+      session.sub !== scope.sub ||
+      authLoadState !== 'ready' ||
+      book.archiveLoad?.status !== 'ready' ||
+      book.pendingWrites > 0 ||
+      autoSyncHandled.current === scope.sub
+    )
+      return;
+    autoSyncHandled.current = scope.sub;
+    onAutoSyncConsumed(scope.sub);
+    launchPreview(session);
+  }, [
+    autoSync,
+    authLoadState,
+    book.archiveLoad?.status,
+    book.pendingWrites,
+    onAutoSyncConsumed,
+    scope,
+    session,
+  ]);
 
   function commit() {
     if (!plan) return;
     const approved = plan;
+    if (!sessionIsUsable(session)) {
+      // A token can expire while the confirmation dialog is open. Reauthenticate
+      // synchronously from this save click, then show a fresh preview for approval.
+      void perform(async () => {
+        const authRequest = requestGoogleSession(authOptions());
+        const next = await authRequest;
+        if (!acceptSession(next)) return;
+        await previewWith(next);
+      });
+      return;
+    }
     void perform(async () => {
       if (!navigator.locks)
         throw new Error(
@@ -180,7 +280,7 @@ export function DriveSyncPanel({
       await navigator.locks.request(
         `ijinden-deckbook:drive:${scope?.sub}`,
         async () => {
-          const auth = assertSession();
+          const auth = assertSession(session);
           const latest = await book.getSyncSnapshot();
           if (!latest?.sync || syncKey(latest) !== syncKey(approved.base))
             throw new Error(
@@ -214,7 +314,7 @@ export function DriveSyncPanel({
               sync: latest.sync,
             }),
           );
-          assertSession();
+          assertSession(auth);
           await client.write(
             {
               format: 'ijinden-deckbook-sync',
@@ -224,7 +324,7 @@ export function DriveSyncPanel({
             },
             remote.files,
           );
-          assertSession();
+          assertSession(auth);
           const applied = await book.applySyncSnapshot(
             syncKey(latest),
             records,
@@ -313,7 +413,7 @@ export function DriveSyncPanel({
         Driveで、保存済みマイデッキ全件とゴミ箱を同期します。作業中の未保存レシピは同期されず、端末内のみに保持されます。
       </p>
       <p className="mt-2 text-xs text-[var(--muted)]">
-        同期は任意・手動です。ページの再読み込み後や認証の有効期限が切れた場合は、Googleへの再接続が必要です。
+        同期ボタンからGoogleへの接続と同期内容の確認に進みます。保存先はこのブラウザに記憶されます。
       </p>
       {!GOOGLE_CLIENT_ID && (
         <p className="mt-2">
@@ -334,20 +434,12 @@ export function DriveSyncPanel({
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
           disabled={busy || authLoadState !== 'ready' || book.pendingWrites > 0}
-          onClick={connect}
+          onClick={startSync}
         >
-          {scope ? 'Googleに接続' : 'Googleで接続'}
+          Google Driveと同期（保存・取得）
         </Button>
         {scope && (
           <>
-            <Button
-              variant="outline"
-              className="h-auto min-h-8 max-w-full whitespace-normal text-left"
-              disabled={busy || !session || book.pendingWrites > 0}
-              onClick={preview}
-            >
-              Google Driveと同期（保存・取得）
-            </Button>
             <Button
               variant="outline"
               className="h-auto min-h-8 max-w-full whitespace-normal text-left"
@@ -399,7 +491,7 @@ export function DriveSyncPanel({
       )}
       {scope && !session && (
         <p className="mt-2 text-xs">
-          端末内のデッキを表示しています。同期するにはGoogleに再接続してください。
+          端末内のデッキを表示しています。同期ボタンを押すとGoogleに再接続できます。
         </p>
       )}
       {scope && (

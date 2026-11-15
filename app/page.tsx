@@ -43,6 +43,11 @@ import {
 } from '@/components/drive-sync-panel';
 import { forgetGoogleSession, type GoogleSession } from '@/lib/google-auth';
 import { localStorageKey } from '@/lib/deck-storage';
+import {
+  forgetRememberedGoogleAccount,
+  loadRememberedGoogleAccount,
+  rememberGoogleAccount,
+} from '@/lib/remembered-google-account';
 
 type AppTab = 'cards' | 'recipe' | 'myDecks' | 'simulator' | 'help';
 type PendingImport = DeckImportParseResult & {
@@ -59,44 +64,28 @@ const cardsById = new Map(cards.map((card) => [card.id, card]));
 const cardIds = new Set(cardsById.keys());
 const cardOrder = new Map(cards.map((card, index) => [card.id, index]));
 export default function Home() {
-  const [scope, setScope] = useState<AccountScope | null>(() => {
-    try {
-      const value = JSON.parse(
-        sessionStorage.getItem('ijinden-deckbook:account') ?? 'null',
-      ) as AccountScope | null;
-      return value &&
-        typeof value.sub === 'string' &&
-        /^\d{1,255}$/.test(value.sub) &&
-        typeof value.email === 'string'
-        ? value
-        : null;
-    } catch {
-      return null;
-    }
-  });
+  const [scope, setScope] = useState<AccountScope | null>(
+    loadRememberedGoogleAccount,
+  );
   const [session, setSession] = useState<GoogleSession | null>(null);
-  function connect(next: GoogleSession) {
+  const [autoSyncSub, setAutoSyncSub] = useState<string | null>(null);
+  function connect(next: GoogleSession, autoSync = false) {
     const account = { sub: next.sub, email: next.email };
-    try {
-      sessionStorage.setItem(
-        'ijinden-deckbook:account',
-        JSON.stringify(account),
-      );
-    } catch {
-      /* Token and current account still stay only in this tab. */
-    }
+    rememberGoogleAccount(account);
     setSession(next);
     setScope(account);
+    setAutoSyncSub(autoSync ? account.sub : null);
   }
   function disconnect() {
-    try {
-      sessionStorage.removeItem('ijinden-deckbook:account');
-    } catch {
-      /* In-memory logout still works. */
-    }
+    forgetRememberedGoogleAccount();
     forgetGoogleSession();
     setSession(null);
     setScope(null);
+    setAutoSyncSub(null);
+  }
+  function invalidateSession() {
+    forgetGoogleSession();
+    setSession(null);
   }
   return (
     <DeckBookPage
@@ -104,6 +93,11 @@ export default function Home() {
       scope={scope}
       session={session}
       onSession={connect}
+      onSessionInvalid={invalidateSession}
+      autoSyncSub={autoSyncSub}
+      onAutoSyncConsumed={(sub) =>
+        setAutoSyncSub((current) => (current === sub ? null : current))
+      }
       onDisconnect={disconnect}
     />
   );
@@ -113,11 +107,17 @@ function DeckBookPage({
   scope,
   session,
   onSession,
+  onSessionInvalid,
+  autoSyncSub,
+  onAutoSyncConsumed,
   onDisconnect,
 }: {
   scope: AccountScope | null;
   session: GoogleSession | null;
-  onSession: (session: GoogleSession) => void;
+  onSession: (session: GoogleSession, autoSync?: boolean) => void;
+  onSessionInvalid: () => void;
+  autoSyncSub: string | null;
+  onAutoSyncConsumed: (sub: string) => void;
   onDisconnect: () => void;
 }) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -563,9 +563,12 @@ function DeckBookPage({
                 book={book}
                 scope={scope}
                 session={session}
+                autoSync={autoSyncSub === scope?.sub}
                 knownCardIds={cardIds}
                 cardsById={cardsById}
                 onSession={onSession}
+                onSessionInvalid={onSessionInvalid}
+                onAutoSyncConsumed={onAutoSyncConsumed}
                 onDisconnect={onDisconnect}
                 notify={showNotice}
               />
